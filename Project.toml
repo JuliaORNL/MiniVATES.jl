@@ -1,0 +1,6 @@
+name = "MiniVATES"
+uuid = "d74cff33-5fb0-4e29-ab32-212d91d0c957"
+authors = ["Philip Fackler <facklerpw@ornl.gov>", 
+           "Steven Hahn <hahnse@ornl.gov>",
+           "William F Godoy <godoywf@ornl.gov>"]
+version = "0.1.0"
