@@ -11,14 +11,14 @@ mutable struct MDNorm
     indexMaker::Id3
 
     function MDNorm(hx::Array1r, kx::Array1r, lx::Array1r)
-        indexMax = I3[200, 200, 1]
+        indexMax = I3[length(hx) - 1, length(kx) - 1, length(lx) - 1]
         new(
             hx,
             kx,
             lx,
             Array1r(),
-            C3[-10.0, -10.0, -0.1],
-            C3[0.1, 0.1, 0.2],
+            C3[first(hx), first(kx), first(lx)],
+            C3[hx[2] - hx[1], kx[2] - kx[1], lx[2] - lx[1]],
             indexMax,
             setUpIndexMaker(indexMax),
         )
@@ -33,6 +33,13 @@ function MDNorm(hx::Vector, kx::Vector, lx::Vector)
     MDNorm(Array1r(hx), Array1r(kx), Array1r(lx))
 end
 
+@inline function maxIntersections(mdn::MDNorm)
+    hNPts = length(mdn.hX)
+    kNPts = length(mdn.kX)
+    lNPts = length(mdn.lX)
+    return hNPts + kNPts + lNPts + 2
+end
+
 """
     calculateIntersections!() -> Vector{Vec4}
 
@@ -41,21 +48,22 @@ surrounding the detector position in HKL.
 
 # Arguments
 - `histogram`: umm...
-- `theta::Float64`: Polar angle with detector
-- `phi::Float64`: Azimuthal angle with detector
+- `theta`: Polar angle with detector
+- `phi`: Azimuthal angle with detector
 - `transform::SquareMatrix3`: Matrix to convert frm Q_lab to HKL ``(2Pi*R *UB*W*SO)^{-1}``
-- `lowvalue::Float64`: The lowest momentum or energy transfer for the trajectory
-- `highvalue::Float64`: The highest momentum or energy transfer for the trajectory
+- `lowvalue`: The lowest momentum or energy transfer for the trajectory
+- `highvalue`: The highest momentum or energy transfer for the trajectory
 """
 @propagate_inbounds function calculateIntersections!(
     mdn::MDNorm,
     histogram::THistogram,
-    theta::Float64,
-    phi::Float64,
+    theta::CoordType,
+    phi::CoordType,
     transform::SquareMatrix3,
-    lowvalue::Float64,
-    highvalue::Float64,
-    intersections::Vector{Vec4},
+    lowvalue::CoordType,
+    highvalue::CoordType,
+    intersections::PreallocVector{Vec4},
+    iPerm::PreallocVector{SizeType},
 ) where {THistogram}
     sin_theta = sin(theta)
     qout = V3[sin_theta * cos(phi), sin_theta * sin(phi), cos(theta)]
@@ -113,7 +121,6 @@ surrounding the detector position in HKL.
     lStartIdx += 1
 
     empty!(intersections)
-    sizehint!(intersections, hNPts + kNPts + lNPts + 2)
 
     # calculate intersections with planes perpendicular to h
     fmom = (kfmax - kfmin) / (hEnd - hStart)
@@ -183,9 +190,34 @@ surrounding the detector position in HKL.
     end
 
     # sort intersections by final momentum
-    sort!(intersections, lt = (v1, v2) -> v1[4] < v2[4])
+    # sort!(data(intersections), lt = (v1, v2) -> v1[4] < v2[4])
+    resize!(iPerm, length(intersections))
+    sortperm!(iPerm, intersections, lt = (v1, v2) -> v1[4] < v2[4])
 
-    return intersections
+    # TODO: sort on construction ?
+    return SortedPreallocVector(iPerm, intersections)
+end
+
+@propagate_inbounds function calculateIntersections(
+    mdn::MDNorm,
+    histogram::THistogram,
+    theta::CoordType,
+    phi::CoordType,
+    transform::SquareMatrix3,
+    lowvalue::CoordType,
+    highvalue::CoordType,
+) where {THistogram}
+    intersections = PreallocVector(Vector{Vec4}(undef, maxIntersections(mdn)))
+    return calculateIntersections!(
+        mdn,
+        histogram,
+        theta,
+        phi,
+        transform,
+        lowvalue,
+        highvalue,
+        intersections,
+    )
 end
 
 
@@ -200,9 +232,9 @@ specific SpectrumInfo/ExperimentInfo.
 """
 @propagate_inbounds function calculateSingleDetectorNorm!(
     mdn::MDNorm,
-    intersections::Vector{Vec4},
+    intersections::SortedPreallocVector{Vec4},
     solid::ScalarType,
-    yValues::Vector{ScalarType},
+    yValues::PreallocVector{ScalarType},
     histogram::THistogram,
 ) where {THistogram}
     for i = 2:length(intersections)
@@ -236,10 +268,10 @@ specific SpectrumInfo/ExperimentInfo.
 end
 
 struct XValues
-    ix::Vector{Vec4}
+    ix::AbstractVector{Vec4}
 end
 
-@propagate_inbounds @inline Base.getindex(xValues::XValues, i::Integer) = xValues.ix[i][4]
+@propagate_inbounds Base.getindex(xValues::XValues, i::Integer) = xValues.ix[i][4]
 @inline Base.length(xValues::XValues) = length(xValues.ix)
 
 """
@@ -251,13 +283,12 @@ results in yValues.
 - `integrFlux`: A workspace with the spectra to interpolate
 - `sp::SizeType`: A workspace index for a spectrum in integrFlux to interpolate.
 """
-@propagate_inbounds function calculateIntegralsForIntersections(
+@propagate_inbounds function calculateIntegralsForIntersections!(
     xValues::XValues,
-    integrFlux_x::AbstractRange,
-    integrFlux_y::Vector{Vector{ScalarType}},
-    sp::SizeType,
+    integrFlux_x::AbstractRange{ScalarType},
+    integrFlux_y::Vector{ScalarType},
+    yValues::PreallocVector{ScalarType},
 )
-
     # the x-data from the workspace
     xData = integrFlux_x
     xStart = first(xData)
@@ -266,7 +297,7 @@ results in yValues.
     # the values in integrFlux are expected to be integrals of a non-negative
     # function
     # ie they must make a non-decreasing function
-    yData = integrFlux_y[sp]
+    yData = integrFlux_y
     yMin = 0.0
     yMax = last(yData)
 
@@ -274,15 +305,17 @@ results in yValues.
 
     # all integrals below xStart must be 0
     if xValues[nData] < xStart
-        return fill(yMin, nData)
+        fill!(yValues, yMin, nData)
+        return yValues
     end
 
     # all integrals above xEnd must be equal to yMax
     if xValues[1] > xEnd
-        return fill(yMax, nData)
+        fill!(yValues, yMax, nData)
+        return yValues
     end
 
-    yValues = Vector{ScalarType}(undef, nData)
+    fill!(yValues, 0.0, nData)
 
     i = 1
     # integrals below xStart must be 0
@@ -316,6 +349,20 @@ results in yValues.
     return yValues
 end
 
+@propagate_inbounds function calculateDiffractionIntersectionIntegral!(
+    intersections::SortedPreallocVector{Vec4},
+    integrFlux_x::AbstractRange{ScalarType},
+    integrFlux_y::Vector{ScalarType},
+    yValues::PreallocVector{ScalarType},
+)
+    return calculateIntegralsForIntersections!(
+        XValues(intersections),
+        integrFlux_x,
+        integrFlux_y,
+        yValues,
+    )
+end
+
 """
 Calculate the diffraction MDE's intersection integral of a certain
 detector/spectru
@@ -326,13 +373,16 @@ detector/spectru
 - `wsIdx::SizeType`: workspace index
 """
 @propagate_inbounds function calculateDiffractionIntersectionIntegral(
-    intersections::Vector{Vec4},
-    integrFlux_x::AbstractRange,
-    integrFlux_y::Vector{Vector{ScalarType}},
-    wsIdx::SizeType,
+    intersections::PreallocVector{Vec4},
+    integrFlux_x::AbstractRange{ScalarType},
+    integrFlux_y::Vector{ScalarType},
 )
-    # xValues = map(inte -> inte[4], intersections)
-    xValues = XValues(intersections)
-    yValues = calculateIntegralsForIntersections(xValues, integrFlux_x, integrFlux_y, wsIdx)
-    return (xValues, yValues)
+    yValues = PreallocVector(Vector{ScalarType}(undef, length(intersections)))
+    calculateDiffractionIntersectionIntegral!(
+        intersections,
+        integrFlux_x,
+        integrFlux_y,
+        yValues,
+    )
+    return yValues
 end

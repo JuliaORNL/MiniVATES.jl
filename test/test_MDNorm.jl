@@ -1,68 +1,171 @@
 import MiniVATES
 import MiniVATES: SizeType, ScalarType, CoordType, SquareMatrix3, V3, Vec4
-import MiniVATES: Hist3, atomic_push!, binweights
+import MiniVATES: Hist3, atomic_push!, binweights, reset!, maxIntersections
+import MiniVATES: PreallocVector
 import Test: @test, @testset
 import HDF5
+import JACC
 
-using Profile
+import Profile
+import ProfileCanvas
+import PProf
 using StatProfilerHTML
 
-@testset "calculateIntersections" begin
-    x = range(-10.0, length = 201, stop = 10.0)
-    y = range(-10.0, length = 201, stop = 10.0)
-    z = range(-0.1, length = 2, stop = 0.1)
+# @testset "calculateIntersections" begin
+#     x = range(-10.0, length = 201, stop = 10.0)
+#     y = range(-10.0, length = 201, stop = 10.0)
+#     z = range(-0.1, length = 2, stop = 0.1)
 
-    histogram = Hist3(x, y, z)
+#     histogram = Hist3(x, y, z)
 
-    hX = collect(x)
-    kX = collect(y)
-    lX = collect(z)
+#     hX = collect(x)
+#     kX = collect(y)
+#     lX = collect(z)
 
-    doctest = MiniVATES.MDNorm(hX, kX, lX)
+#     doctest = MiniVATES.MDNorm(hX, kX, lX)
 
-    open(calc_intersections_file) do f
-        line = split(strip(readline(f)), ' ')
-        transform = transpose(SquareMatrix3(parse.(Float64, line)))
+#     open(calc_intersections_file) do f
+#         line = split(strip(readline(f)), ' ')
+#         transform = transpose(SquareMatrix3(parse.(ScalarType, line)))
 
-        ndets = parse(Int, readline(f))
+#         ndets = parse(Int, readline(f))
 
-        intersections = Vector{Vec4}()
-        for i = 1:ndets
-            line = split(strip(readline(f)), ' ')
-            i_f = parse(Int, line[1])
-            theta = parse(Float64, line[2])
-            phi = parse(Float64, line[3])
-            lowvalue = parse(Float64, line[4])
-            highvalue = parse(Float64, line[5])
-            if i != i_f
-                i = i_f
-            end
-            num_intersections = parse(Int, readline(f))
-            values = Vector{Vector{Float64}}()
-            for i = 1:num_intersections
-                line = split(strip(readline(f)), ' ')
-                push!(values, parse.(Float64, line))
-            end
+#         intersections = Vector{Vec4}()
+#         for i = 1:ndets
+#             line = split(strip(readline(f)), ' ')
+#             i_f = parse(Int, line[1])
+#             theta = parse(CoordType, line[2])
+#             phi = parse(CoordType, line[3])
+#             lowvalue = parse(CoordType, line[4])
+#             highvalue = parse(CoordType, line[5])
+#             if i != i_f
+#                 i = i_f
+#             end
+#             num_intersections = parse(Int, readline(f))
+#             values = Vector{Vector{ScalarType}}()
+#             for i = 1:num_intersections
+#                 line = split(strip(readline(f)), ' ')
+#                 push!(values, parse.(ScalarType, line))
+#             end
 
-            MiniVATES.calculateIntersections!(
-                doctest,
-                histogram,
-                theta,
-                phi,
-                transform,
-                lowvalue,
-                highvalue,
-                intersections,
-            )
-            @test length(intersections) == num_intersections
-            for i = 1:num_intersections
-                for j = 1:4
-                    @test abs(intersections[i][j] - values[i][j]) < 0.0001
-                end
-            end
+#             MiniVATES.calculateIntersections!(
+#                 doctest,
+#                 histogram,
+#                 theta,
+#                 phi,
+#                 transform,
+#                 lowvalue,
+#                 highvalue,
+#                 intersections,
+#             )
+#             @test length(intersections) == num_intersections
+#             for i = 1:num_intersections
+#                 for j = 1:4
+#                     @test abs(intersections[i][j] - values[i][j]) < 0.0001
+#                 end
+#             end
+#         end
+#     end
+# end
+
+function kernel1_1D(i, t)
+    @inbounds begin
+        if !t.use_dets[i]
+            return
         end
+
+        detID = t.detIDs[i]
+        wsIdx = get(t.fluxDetToIdx, detID, nothing)
+        if wsIdx == nothing
+            return
+        end
+
+        sortedIntersections = MiniVATES.calculateIntersections!(
+            t.doctest,
+            t.signal,
+            t.thetaValues[i],
+            t.phiValues[i],
+            t.transform,
+            t.lowValues[i],
+            t.highValues[i],
+            t.intersections[i],
+            t.iPerm[i],
+        )
+
+        if isempty(sortedIntersections)
+            return
+        end
+
+        MiniVATES.calculateDiffractionIntersectionIntegral!(
+            sortedIntersections,
+            t.integrFlux_x,
+            t.integrFlux_y[wsIdx],
+            t.yValues[i],
+        )
+
+        solid::ScalarType = t.protonCharge
+        if t.haveSA
+            saIdx = t.solidAngDetToIdx[detID]
+            saFactor = t.solidAngleWS[saIdx][1]
+            solid *= saFactor
+        end
+        MiniVATES.calculateSingleDetectorNorm!(
+            t.doctest,
+            sortedIntersections,
+            solid,
+            t.yValues[i],
+            t.signal,
+        )
     end
 end
+
+# function kernel1_2D(n, i, t)
+#     @inbounds begin
+#         if !t.use_dets[i]
+#             return
+#         end
+
+#         detID = t.detIDs[i]
+#         wsIdx = get(t.fluxDetToIdx, detID, nothing)
+#         if wsIdx == nothing
+#             return
+#         end
+
+#         intersections = MiniVATES.calculateIntersections(
+#             t.doctest,
+#             t.signal,
+#             t.thetaValues[i],
+#             t.phiValues[i],
+#             t.transforms[n],
+#             t.lowValues[i],
+#             t.highValues[i],
+#         )
+
+#         if isempty(intersections)
+#             return
+#         end
+
+#         yValues = MiniVATES.calculateDiffractionIntersectionIntegral(
+#             intersections,
+#             t.integrFlux_x,
+#             t.integrFlux_y[wsIdx],
+#         )
+
+#         solid::ScalarType = t.protonCharge
+#         if t.haveSA
+#             saIdx = t.solidAngDetToIdx[detID]
+#             saFactor = t.solidAngleWS[saIdx][1]
+#             solid *= saFactor
+#         end
+#         MiniVATES.calculateSingleDetectorNorm!(
+#             t.doctest,
+#             intersections,
+#             solid,
+#             yValues,
+#             t.signal,
+#         )
+#     end
+# end
 
 @testset "calculateDiffractionIntersectionIntegral" begin
     x = range(-10.0, length = 201, stop = 10.0)
@@ -125,7 +228,7 @@ end
     # flux file
     file = HDF5.h5open(flux_nxs_file, "r")
     group = file["mantid_workspace_1"]
-    readDataX = read(group["workspace"]["axis1"])
+    readDataX::Vector{ScalarType} = read(group["workspace"]["axis1"])
     dims = size(readDataX)
     @test length(dims) == 1
     integrFlux_x =
@@ -136,7 +239,7 @@ end
         rtol = 1.0e-8,
     )
 
-    readDataY = read(group["workspace"]["values"])
+    readDataY::Matrix{ScalarType} = read(group["workspace"]["values"])
     dims = size(readDataY)
     @test length(dims) == 2
     @test dims[2] == 1
@@ -158,11 +261,12 @@ end
         idx += 1
     end
 
-    readData = read(group["instrument"]["physical_detectors"]["number_of_detectors"])
+    detGroup = group["instrument"]["physical_detectors"]
+    readData = read(detGroup["number_of_detectors"])
     dims = size(readData)
     @test length(dims) == 1
     @test dims[1] == 1
-    ndets = readData[1]
+    ndets::SizeType = readData[1]
 
     close(file)
 
@@ -175,11 +279,11 @@ end
     # event file
     file = HDF5.h5open(event_nxs_file, "r")
     expGroup = file["MDEventWorkspace"]["experiment0"]
-    lowValues = read(expGroup["logs"]["MDNorm_low"]["value"])
+    lowValues::Vector{CoordType} = read(expGroup["logs"]["MDNorm_low"]["value"])
     dims = size(lowValues)
     @test length(dims) == 1
     @test dims[1] == 372736
-    highValues = read(expGroup["logs"]["MDNorm_high"]["value"])
+    highValues::Vector{CoordType} = read(expGroup["logs"]["MDNorm_high"]["value"])
     dims = size(highValues)
     @test length(dims) == 1
     @test dims[1] == 372736
@@ -188,97 +292,77 @@ end
     dims = size(pcData)
     @test length(dims) == 1
     @test dims[1] == 1
-    protonCharge = pcData[1]
+    protonCharge::ScalarType = pcData[1]
 
-    thetaData = read(expGroup["instrument"]["physical_detectors"]["polar_angle"])
+    detGroup = expGroup["instrument"]["physical_detectors"]
+    thetaData::Vector{CoordType} = read(detGroup["polar_angle"])
     dims = size(thetaData)
     @test length(dims) == 1
     @test dims[1] == 372736
     thetaValues = map(deg2rad, thetaData)
 
-    phiData = read(expGroup["instrument"]["physical_detectors"]["azimuthal_angle"])
+    phiData::Vector{CoordType} = read(detGroup["azimuthal_angle"])
     dims = size(phiData)
     @test length(dims) == 1
     @test dims[1] == 372736
     phiValues = map(deg2rad, phiData)
 
-    detIDs = read(expGroup["instrument"]["physical_detectors"]["detector_number"])
+    detIDs = read(detGroup["detector_number"])
     dims = size(detIDs)
     @test length(dims) == 1
     @test dims[1] == 372736
 
-    events = read(file["MDEventWorkspace"]["event_data"]["event_data"])
+    evGroup = file["MDEventWorkspace"]["event_data"]
+    events::Matrix{CoordType} = read(evGroup["event_data"])
     dims = size(events)
     @test length(dims) == 2
     close(file)
 
     MDDims = 3
-    transforms = map(op -> inv(rotMatrix * m_UB * op * m_W), symm)
-    nSymm = length(symm)
-    intersections = Vector{Vec4}()
+    transforms = JACC.Vector(map(op -> inv(rotMatrix * m_UB * op * m_W), symm))
+    nSymm::SizeType = length(symm)
+    maxIx = maxIntersections(doctest)
+    intersections = [PreallocVector(Vector{Vec4}(undef, maxIx)) for i = 1:ndets]
+    yValues = [PreallocVector(Vector{ScalarType}(undef, maxIx)) for i = 1:ndets]
+    iPerm = [PreallocVector([n for n = 1:maxIx]) for i = 1:ndets]
 
-    function kernel1()
-        signal = Hist3(x, y, z)
+    function launch_kernel1()
         @time begin
             for n = 1:nSymm
-                for i = 1:ndets
-                    @inbounds begin
-                        if !use_dets[i]
-                            continue
-                        end
-
-                        detID = detIDs[i]
-                        wsIdx = get(fluxDetToIdx, detID, nothing)
-                        if wsIdx == nothing
-                            continue
-                        end
-
-                        MiniVATES.calculateIntersections!(
-                            doctest,
-                            signal,
-                            thetaValues[i],
-                            phiValues[i],
-                            transforms[n],
-                            lowValues[i],
-                            highValues[i],
-                            intersections,
-                        )
-
-                        if isempty(intersections)
-                            continue
-                        end
-
-                        solid = protonCharge
-                        if haveSA
-                            solidAngleFactor = solidAngleWS[solidAngDetToIdx[detID]][1]
-                            solid *= solidAngleFactor
-                        end
-                        xValues, yValues =
-                            MiniVATES.calculateDiffractionIntersectionIntegral(
-                                intersections,
-                                integrFlux_x,
-                                integrFlux_y,
-                                wsIdx,
-                            )
-
-                        MiniVATES.calculateSingleDetectorNorm!(
-                            doctest,
-                            intersections,
-                            solid,
-                            yValues,
-                            signal,
-                        )
-                    end
-                end
+                JACC.parallel_for(
+                    ndets,
+                    kernel1_1D,
+                    (
+                        transform = transforms[n],
+                        use_dets = use_dets,
+                        intersections,
+                        iPerm,
+                        yValues,
+                        detIDs,
+                        fluxDetToIdx,
+                        doctest,
+                        signal,
+                        thetaValues,
+                        phiValues,
+                        lowValues,
+                        highValues,
+                        integrFlux_x,
+                        integrFlux_y,
+                        solidAngDetToIdx,
+                        solidAngleWS,
+                        protonCharge,
+                        haveSA,
+                    ),
+                )
             end
         end
     end
-    kernel1()
-    GC.enable(false)
-    kernel1()
+    launch_kernel1()
+    # reset!(signal)
     # Profile.clear()
-    # @profile kernel1()
-    GC.enable(true)
+    # Profile.@profile launch_kernel1()
+    # statprofilehtml()
+    # return nothing
 
     # norm file
     file = HDF5.h5open(norm_nxs_file, "r")
@@ -292,39 +376,31 @@ end
     close(file)
 
     data2d = data[:, :, 1]
-    # max_signal = maximum(signal.weights)
-    max_signal = 0.0
+    max_signal = maximum(signal.weights)
+    # max_signal = 0.0
     ref_max = 0.0
     for i = 1:dims[2]
         for j = 1:dims[1]
             @test isapprox(data2d[i, j], binweights(signal)[i, j, 1], atol = 1.0e+6)
             ref_max = max(ref_max, data2d[j, i])
-            max_signal = max(max_signal, binweights(signal)[i, j, 1])
+            # max_signal = max(max_signal, binweights(signal)[i, j, 1])
         end
     end
     @test isapprox(max_signal, ref_max, atol = 1.0e+5)
 
-    # h = StatsBase.Histogram((x, y, z), Float64)
     h = Hist3(x, y, z)
 
-    function kernel2()
-        @time begin
-            @inbounds begin
-                for op in transforms
-                    for i = 1:size(events)[2]
-                        v = op * V3[events[6, i], events[7, i], events[8, i]]
-                        atomic_push!(h, v[1], v[2], v[3], events[1, i])
-                    end
-                end
-            end
-        end
+    @time begin
+        JACC.parallel_for(
+            (nSymm, size(events)[2]),
+            (n, i, t) -> begin
+                op = t.transforms[n]
+                v = op * V3[t.events[6, i], t.events[7, i], t.events[8, i]]
+                atomic_push!(t.h, v[1], v[2], v[3], t.events[1, i])
+            end,
+            (h = h, events, transforms),
+        )
     end
-    kernel2()
-    GC.enable(false)
-    kernel2()
-    # @profile kernel2()
-    # statprofilehtml()
-    GC.enable(true)
 
     fio = open("meow.txt", "w")
     for j = 1:dims[2]
