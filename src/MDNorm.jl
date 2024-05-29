@@ -1,26 +1,26 @@
 import Base: @propagate_inbounds
 
-mutable struct MDNorm
-    hX::Array1r
-    kX::Array1r
-    lX::Array1r
-    eX::Array1r
-    origin::Crd3
-    boxLength::Crd3
-    indexMax::Id3
-    indexMaker::Id3
+mutable struct MDNorm{TArray}
+    hX::TArray
+    kX::TArray
+    lX::TArray
+    eX::TArray
+    # origin::Crd3
+    # boxLength::Crd3
+    # indexMax::Id3
+    # indexMaker::Id3
 
-    function MDNorm(hx::Array1r, kx::Array1r, lx::Array1r)
+    function MDNorm(hx::TArray, kx::TArray, lx::TArray) where {TArray}
         indexMax = I3[length(hx) - 1, length(kx) - 1, length(lx) - 1]
-        new(
+        new{TArray}(
             hx,
             kx,
             lx,
-            Array1r(),
-            C3[first(hx), first(kx), first(lx)],
-            C3[hx[2] - hx[1], kx[2] - kx[1], lx[2] - lx[1]],
-            indexMax,
-            setUpIndexMaker(indexMax),
+            TArray(),
+            # C3[first(hx), first(kx), first(lx)],
+            # C3[hx[2] - hx[1], kx[2] - kx[1], lx[2] - lx[1]],
+            # indexMax,
+            # setUpIndexMaker(indexMax),
         )
     end
 end
@@ -29,9 +29,9 @@ function MDNorm()
     MDNorm(Array1r(), Array1r(), Array1r())
 end
 
-function MDNorm(hx::Vector, kx::Vector, lx::Vector)
-    MDNorm(Array1r(hx), Array1r(kx), Array1r(lx))
-end
+# function MDNorm(hx::Vector, kx::Vector, lx::Vector)
+#     MDNorm(Array1r(hx), Array1r(kx), Array1r(lx))
+# end
 
 @inline function maxIntersections(mdn::MDNorm)
     hNPts = length(mdn.hX)
@@ -50,7 +50,7 @@ surrounding the detector position in HKL.
 - `histogram`: umm...
 - `theta`: Polar angle with detector
 - `phi`: Azimuthal angle with detector
-- `transform::SquareMatrix3C`: Matrix to convert frm Q_lab to HKL ``(2Pi*R *UB*W*SO)^{-1}``
+- `transform::SquareMatrix3c`: Matrix to convert frm Q_lab to HKL ``(2Pi*R *UB*W*SO)^{-1}``
 - `lowvalue`: The lowest momentum or energy transfer for the trajectory
 - `highvalue`: The highest momentum or energy transfer for the trajectory
 """
@@ -59,7 +59,7 @@ surrounding the detector position in HKL.
     histogram::THistogram,
     theta::CoordType,
     phi::CoordType,
-    transform::SquareMatrix3C,
+    transform::SquareMatrix3c,
     lowvalue::CoordType,
     highvalue::CoordType,
     intersections::PreallocVector{Crd4},
@@ -203,7 +203,7 @@ end
     histogram::THistogram,
     theta::CoordType,
     phi::CoordType,
-    transform::SquareMatrix3C,
+    transform::SquareMatrix3c,
     lowvalue::CoordType,
     highvalue::CoordType,
 ) where {THistogram}

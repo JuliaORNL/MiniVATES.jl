@@ -47,8 +47,8 @@ end
 const SquareMatrix3{T} = StaticArrays.SMatrix{3,3,T} where {T}
 @inline SquareMatrix3{T}() where {T} = zeros(SquareMatrix3{T})
 
-const SquareMatrix3V = SquareMatrix3{ScalarType}
-const SquareMatrix3C = SquareMatrix3{CoordType}
+const SquareMatrix3r = SquareMatrix3{ScalarType}
+const SquareMatrix3c = SquareMatrix3{CoordType}
 
 const Array1 = JACC.Array{T,1} where {T}
 @inline Array1{T}(n::Int64) where {T} = Array1{T}(undef, n)

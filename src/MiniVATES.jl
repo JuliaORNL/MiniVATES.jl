@@ -4,15 +4,18 @@ import JACC
 import Pkg
 
 @static if endswith(JACC.JACCPreferences.backend, "cuda")
-    # @TODO Julia Pkg.add will add target = :weakdeps in later versions
-    Pkg.add("CUDA")
+    if !haskey(Pkg.project().dependencies, "CUDA")
+        # @TODO Julia Pkg.add will add target = :weakdeps in later versions
+        Pkg.add("CUDA")
+        import CUDA
+        CUDA.set_runtime_version!(local_toolkit=true)
+    end
     import CUDA
-    println("Using CUDA as back end")
-    CUDA.set_runtime_version!(local_toolkit=true)
+    println("Using CUDA backend for JACC")
 elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
     Pkg.add("AMDGPU")
     import AMDGPU
-    println("Using AMDGPU as back end")
+    println("Using AMDGPU backend for JACC")
 end
 
 include("Util.jl")

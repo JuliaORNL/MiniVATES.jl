@@ -1,6 +1,6 @@
 import MiniVATES
 import MiniVATES: SizeType, ScalarType, CoordType
-import MiniVATES: SquareMatrix3C, C3, Crd3, Crd4
+import MiniVATES: SquareMatrix3c, C3, Crd3, Crd4
 import MiniVATES: Hist3, atomic_push!, binweights, reset!, maxIntersections
 import MiniVATES: PreallocVector
 import Test: @test, @testset
@@ -28,7 +28,7 @@ using StatProfilerHTML
 
     open(calc_intersections_file) do f
         line = split(strip(readline(f)), ' ')
-        transform = transpose(SquareMatrix3C(parse.(ScalarType, line)))
+        transform = transpose(SquareMatrix3c(parse.(ScalarType, line)))
 
         ndets = parse(Int, readline(f))
 
@@ -138,17 +138,17 @@ end
 
     # rot file
     file = HDF5.h5open(rot_nxs_file, "r")
-    rotMatrix = transpose(SquareMatrix3C(read(file["expinfo_0"]["goniometer_0"])))
+    rotMatrix = transpose(SquareMatrix3c(read(file["expinfo_0"]["goniometer_0"])))
 
-    symm = Vector{SquareMatrix3C}()
+    symm = Vector{SquareMatrix3c}()
     symmGroup = file["symmetryOps"]
     for i = 1:length(symmGroup)
         push!(symm, transpose(read(symmGroup["op_" * string(i - 1)])))
     end
 
-    m_UB = transpose(SquareMatrix3C(read(file["ubmatrix"])))
+    m_UB = transpose(SquareMatrix3c(read(file["ubmatrix"])))
     close(file)
-    m_W = SquareMatrix3C([1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
+    m_W = SquareMatrix3c([1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
 
     # sa file
     file = HDF5.h5open(sa_nxs_file, "r")
