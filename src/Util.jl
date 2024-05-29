@@ -11,21 +11,24 @@ end
     return a + t * (b - a)
 end
 
-const SignalType = Float64
+const SignalType = Float32
 const CoordType = Float32
-const ScalarType = Float64
+const ScalarType = Float32
 
 const Vector3{T} = StaticArrays.SVector{3,T} where {T}
+const Vector4{T} = StaticArrays.SVector{4,T} where {T}
+
 const Vec3 = Vector3{ScalarType}
 @inline Vec3() = Vec3(0, 0, 0)
 const V3 = StaticArrays.SA{ScalarType}
-const Vector4{T} = StaticArrays.SVector{4,T} where {T}
 const Vec4 = Vector4{ScalarType}
 const V4 = StaticArrays.SA{ScalarType}
 
-const Crd3 = StaticArrays.SVector{3,CoordType}
+const Crd3 = Vector3{CoordType}
 @inline Crd3() = Crd3(0, 0, 0)
+const Crd4 = Vector4{CoordType}
 const C3 = StaticArrays.SA{CoordType}
+const C4 = StaticArrays.SA{CoordType}
 
 # const SizeType = UInt64
 const SizeType = Int
@@ -41,8 +44,11 @@ function setUpIndexMaker(indexMax::Id3)
     return out
 end
 
-const SquareMatrix3 = StaticArrays.SMatrix{3,3,ScalarType}
-@inline SquareMatrix3() = zeros(SquareMatrix3)
+const SquareMatrix3{T} = StaticArrays.SMatrix{3,3,T} where {T}
+@inline SquareMatrix3{T}() where {T} = zeros(SquareMatrix3{T})
+
+const SquareMatrix3V = SquareMatrix3{ScalarType}
+const SquareMatrix3C = SquareMatrix3{CoordType}
 
 const Array1 = JACC.Array{T,1} where {T}
 @inline Array1{T}(n::Int64) where {T} = Array1{T}(undef, n)

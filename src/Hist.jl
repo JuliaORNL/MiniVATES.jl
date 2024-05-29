@@ -58,13 +58,13 @@ end
     h.weights = zeros(SignalType, h.nbins)
 end
 
-@propagate_inbounds function binindex1d(h::Hist3_Cust, d::SizeType, crd)
+@propagate_inbounds function binindex1d(h::Hist3_Cust, d::SizeType, crd::CoordType)
     dist = crd - h.origin[d]
     if dist < 0.0
         return 0
     end
 
-    idx = floor(Int, dist / h.boxLength[d]) + 1
+    idx = trunc(Int, dist / h.boxLength[d]) + 1
     if idx > h.nbins[d]
         return h.nbins[d] + 1
     end
@@ -72,11 +72,26 @@ end
     return idx
 end
 
-@propagate_inbounds function binindex(h::Hist3_Cust, x, y, z)
+@propagate_inbounds function binindex(
+    h::Hist3_Cust,
+    x::CoordType,
+    y::CoordType,
+    z::CoordType,
+)
     return (binindex1d(h, 1, x), binindex1d(h, 2, y), binindex1d(h, 3, z))
 end
 
-@propagate_inbounds function atomic_push!(h::Hist3_Cust, x, y, z, wt)
+@propagate_inbounds function binindex(h::Hist3_Cust, x, y, z)
+    return binindex(h, convert(CoordType, x), convert(CoordType, y), convert(CoordType, z))
+end
+
+@propagate_inbounds function atomic_push!(
+    h::Hist3_Cust,
+    x::CoordType,
+    y::CoordType,
+    z::CoordType,
+    wt,
+)
     ix, iy, iz = binindex(h, x, y, z)
     lx, ly, lz = h.nbins
     if (unsigned(ix - 1) < lx) && (unsigned(iy - 1) < ly) && (unsigned(iz - 1) < lz)

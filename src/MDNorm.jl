@@ -41,7 +41,7 @@ end
 end
 
 """
-    calculateIntersections!() -> Vector{Vec4}
+    calculateIntersections!() -> Vector{Crd4}
 
 Calculate the points of intersection for the given detector with cuboid
 surrounding the detector position in HKL.
@@ -50,7 +50,7 @@ surrounding the detector position in HKL.
 - `histogram`: umm...
 - `theta`: Polar angle with detector
 - `phi`: Azimuthal angle with detector
-- `transform::SquareMatrix3`: Matrix to convert frm Q_lab to HKL ``(2Pi*R *UB*W*SO)^{-1}``
+- `transform::SquareMatrix3C`: Matrix to convert frm Q_lab to HKL ``(2Pi*R *UB*W*SO)^{-1}``
 - `lowvalue`: The lowest momentum or energy transfer for the trajectory
 - `highvalue`: The highest momentum or energy transfer for the trajectory
 """
@@ -59,15 +59,15 @@ surrounding the detector position in HKL.
     histogram::THistogram,
     theta::CoordType,
     phi::CoordType,
-    transform::SquareMatrix3,
+    transform::SquareMatrix3C,
     lowvalue::CoordType,
     highvalue::CoordType,
-    intersections::PreallocVector{Vec4},
+    intersections::PreallocVector{Crd4},
     iPerm::PreallocVector{SizeType},
 ) where {THistogram}
     sin_theta = sin(theta)
-    qout = V3[sin_theta * cos(phi), sin_theta * sin(phi), cos(theta)]
-    qin = V3[0, 0, 1]
+    qout = C3[sin_theta * cos(phi), sin_theta * sin(phi), cos(theta)]
+    qin = C3[0, 0, 1]
 
     qout = transform * qout
     qin = transform * qin
@@ -135,7 +135,7 @@ surrounding the detector position in HKL.
         li = fl * (hi - hStart) + lStart
         if (ki >= kx[1]) && (ki <= kx[kNPts]) && (li >= lx[1]) && (li <= lx[lNPts])
             momi = fmom * (hi - hStart) + kfmin
-            push!(intersections, V4[hi, ki, li, momi])
+            push!(intersections, C4[hi, ki, li, momi])
         end
     end
 
@@ -152,7 +152,7 @@ surrounding the detector position in HKL.
         li = fl * (ki - kStart) + lStart
         if (hi >= hx[1]) && (hi <= hx[hNPts]) && (li >= lx[1]) && (li <= lx[lNPts])
             momi = fmom * (ki - kStart) + kfmin
-            push!(intersections, V4[hi, ki, li, momi])
+            push!(intersections, C4[hi, ki, li, momi])
         end
     end
 
@@ -167,7 +167,7 @@ surrounding the detector position in HKL.
         ki = fk * (li - lStart) + kStart
         if (hi >= hx[1]) && (hi <= hx[hNPts]) && (ki >= kx[1]) && (ki <= kx[kNPts])
             momi = fmom * (li - lStart) + kfmin
-            push!(intersections, V4[hi, ki, li, momi])
+            push!(intersections, C4[hi, ki, li, momi])
         end
     end
 
@@ -178,7 +178,7 @@ surrounding the detector position in HKL.
        (kStart <= kx[kNPts]) &&
        (lStart >= lx[1]) &&
        (lStart <= lx[lNPts])
-        push!(intersections, V4[hStart, kStart, lStart, kfmin])
+        push!(intersections, C4[hStart, kStart, lStart, kfmin])
     end
     if (hEnd >= hx[1]) &&
        (hEnd <= hx[hNPts]) &&
@@ -186,7 +186,7 @@ surrounding the detector position in HKL.
        (kEnd <= kx[kNPts]) &&
        (lEnd >= lx[1]) &&
        (lEnd <= lx[lNPts])
-        push!(intersections, V4[hEnd, kEnd, lEnd, kfmax])
+        push!(intersections, C4[hEnd, kEnd, lEnd, kfmax])
     end
 
     # sort intersections by final momentum
@@ -203,11 +203,11 @@ end
     histogram::THistogram,
     theta::CoordType,
     phi::CoordType,
-    transform::SquareMatrix3,
+    transform::SquareMatrix3C,
     lowvalue::CoordType,
     highvalue::CoordType,
 ) where {THistogram}
-    intersections = PreallocVector(Vector{Vec4}(undef, maxIntersections(mdn)))
+    intersections = PreallocVector(Vector{Crd4}(undef, maxIntersections(mdn)))
     return calculateIntersections!(
         mdn,
         histogram,
@@ -226,13 +226,13 @@ Calculate the normalization among intersections on a single detector in 1
 specific SpectrumInfo/ExperimentInfo.
 
 # Arguments
-- `intersections::Vector{Vec4}`: intersections
+- `intersections::Vector{Crd4}`: intersections
 - `solid::ScalarType`: proton charge
 - `yValues::Vector{ScalarType}`: diffraction intersection integral and common to sample and background
 """
 @propagate_inbounds function calculateSingleDetectorNorm!(
     mdn::MDNorm,
-    intersections::SortedPreallocVector{Vec4},
+    intersections::SortedPreallocVector{Crd4},
     solid::ScalarType,
     yValues::PreallocVector{ScalarType},
     histogram::THistogram,
@@ -253,7 +253,7 @@ specific SpectrumInfo/ExperimentInfo.
 
         # Average between two intersections for final position
         # [Task 89] Sample and background have same 'pos[]'
-        pos = V3[
+        pos = C3[
             0.5 * (curX[1] + prevX[1]),
             0.5 * (curX[2] + prevX[2]),
             0.5 * (curX[3] + prevX[3]),
@@ -268,7 +268,7 @@ specific SpectrumInfo/ExperimentInfo.
 end
 
 struct XValues
-    ix::AbstractVector{Vec4}
+    ix::AbstractVector{Crd4}
 end
 
 @propagate_inbounds Base.getindex(xValues::XValues, i::Integer) = xValues.ix[i][4]
@@ -350,7 +350,7 @@ results in yValues.
 end
 
 @propagate_inbounds function calculateDiffractionIntersectionIntegral!(
-    intersections::SortedPreallocVector{Vec4},
+    intersections::SortedPreallocVector{Crd4},
     integrFlux_x::AbstractRange{ScalarType},
     integrFlux_y::Vector{ScalarType},
     yValues::PreallocVector{ScalarType},
@@ -368,12 +368,12 @@ Calculate the diffraction MDE's intersection integral of a certain
 detector/spectru
 
 # Arguments
-- `intersections::Vector{Vec4}`: vector of intersections
+- `intersections::Vector{Crd4}`: vector of intersections
 - `integrFlux`: integral flux workspace
 - `wsIdx::SizeType`: workspace index
 """
 @propagate_inbounds function calculateDiffractionIntersectionIntegral(
-    intersections::PreallocVector{Vec4},
+    intersections::PreallocVector{Crd4},
     integrFlux_x::AbstractRange{ScalarType},
     integrFlux_y::Vector{ScalarType},
 )

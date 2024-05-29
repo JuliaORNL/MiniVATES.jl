@@ -1,5 +1,6 @@
 import MiniVATES
-import MiniVATES: SizeType, ScalarType, CoordType, SquareMatrix3, V3, Vec4
+import MiniVATES: SizeType, ScalarType, CoordType
+import MiniVATES: SquareMatrix3C, C3, Crd3, Crd4
 import MiniVATES: Hist3, atomic_push!, binweights, reset!, maxIntersections
 import MiniVATES: PreallocVector
 import Test: @test, @testset
@@ -11,62 +12,65 @@ import ProfileCanvas
 import PProf
 using StatProfilerHTML
 
-# @testset "calculateIntersections" begin
-#     x = range(-10.0, length = 201, stop = 10.0)
-#     y = range(-10.0, length = 201, stop = 10.0)
-#     z = range(-0.1, length = 2, stop = 0.1)
+@testset "calculateIntersections" begin
+    x = range(-10.0, length = 201, stop = 10.0)
+    y = range(-10.0, length = 201, stop = 10.0)
+    z = range(-0.1, length = 2, stop = 0.1)
 
-#     histogram = Hist3(x, y, z)
+    histogram = Hist3(x, y, z)
 
-#     hX = collect(x)
-#     kX = collect(y)
-#     lX = collect(z)
+    hX = collect(x)
+    kX = collect(y)
+    lX = collect(z)
 
-#     doctest = MiniVATES.MDNorm(hX, kX, lX)
+    doctest = MiniVATES.MDNorm(hX, kX, lX)
+    maxIx = maxIntersections(doctest)
 
-#     open(calc_intersections_file) do f
-#         line = split(strip(readline(f)), ' ')
-#         transform = transpose(SquareMatrix3(parse.(ScalarType, line)))
+    open(calc_intersections_file) do f
+        line = split(strip(readline(f)), ' ')
+        transform = transpose(SquareMatrix3C(parse.(ScalarType, line)))
 
-#         ndets = parse(Int, readline(f))
+        ndets = parse(Int, readline(f))
 
-#         intersections = Vector{Vec4}()
-#         for i = 1:ndets
-#             line = split(strip(readline(f)), ' ')
-#             i_f = parse(Int, line[1])
-#             theta = parse(CoordType, line[2])
-#             phi = parse(CoordType, line[3])
-#             lowvalue = parse(CoordType, line[4])
-#             highvalue = parse(CoordType, line[5])
-#             if i != i_f
-#                 i = i_f
-#             end
-#             num_intersections = parse(Int, readline(f))
-#             values = Vector{Vector{ScalarType}}()
-#             for i = 1:num_intersections
-#                 line = split(strip(readline(f)), ' ')
-#                 push!(values, parse.(ScalarType, line))
-#             end
+        intersections = PreallocVector(Vector{Crd4}(undef, maxIx))
+        iPerm = PreallocVector([n for n = 1:maxIx])
+        for i = 1:ndets
+            line = split(strip(readline(f)), ' ')
+            i_f = parse(Int, line[1])
+            theta = parse(CoordType, line[2])
+            phi = parse(CoordType, line[3])
+            lowvalue = parse(CoordType, line[4])
+            highvalue = parse(CoordType, line[5])
+            if i != i_f
+                i = i_f
+            end
+            num_intersections = parse(Int, readline(f))
+            values = Vector{Vector{ScalarType}}()
+            for i = 1:num_intersections
+                line = split(strip(readline(f)), ' ')
+                push!(values, parse.(ScalarType, line))
+            end
 
-#             MiniVATES.calculateIntersections!(
-#                 doctest,
-#                 histogram,
-#                 theta,
-#                 phi,
-#                 transform,
-#                 lowvalue,
-#                 highvalue,
-#                 intersections,
-#             )
-#             @test length(intersections) == num_intersections
-#             for i = 1:num_intersections
-#                 for j = 1:4
-#                     @test abs(intersections[i][j] - values[i][j]) < 0.0001
-#                 end
-#             end
-#         end
-#     end
-# end
+            sortedIntersections = MiniVATES.calculateIntersections!(
+                doctest,
+                histogram,
+                theta,
+                phi,
+                transform,
+                lowvalue,
+                highvalue,
+                intersections,
+                iPerm,
+            )
+            @test length(intersections) == num_intersections
+            for i = 1:num_intersections
+                for j = 1:4
+                    @test isapprox(sortedIntersections[i][j], values[i][j], rtol = 0.01)
+                end
+            end
+        end
+    end
+end
 
 function kernel1_1D(i, t)
     @inbounds begin
@@ -119,54 +123,6 @@ function kernel1_1D(i, t)
     end
 end
 
-# function kernel1_2D(n, i, t)
-#     @inbounds begin
-#         if !t.use_dets[i]
-#             return
-#         end
-
-#         detID = t.detIDs[i]
-#         wsIdx = get(t.fluxDetToIdx, detID, nothing)
-#         if wsIdx == nothing
-#             return
-#         end
-
-#         intersections = MiniVATES.calculateIntersections(
-#             t.doctest,
-#             t.signal,
-#             t.thetaValues[i],
-#             t.phiValues[i],
-#             t.transforms[n],
-#             t.lowValues[i],
-#             t.highValues[i],
-#         )
-
-#         if isempty(intersections)
-#             return
-#         end
-
-#         yValues = MiniVATES.calculateDiffractionIntersectionIntegral(
-#             intersections,
-#             t.integrFlux_x,
-#             t.integrFlux_y[wsIdx],
-#         )
-
-#         solid::ScalarType = t.protonCharge
-#         if t.haveSA
-#             saIdx = t.solidAngDetToIdx[detID]
-#             saFactor = t.solidAngleWS[saIdx][1]
-#             solid *= saFactor
-#         end
-#         MiniVATES.calculateSingleDetectorNorm!(
-#             t.doctest,
-#             intersections,
-#             solid,
-#             yValues,
-#             t.signal,
-#         )
-#     end
-# end
-
 @testset "calculateDiffractionIntersectionIntegral" begin
     x = range(-10.0, length = 201, stop = 10.0)
     y = range(-10.0, length = 201, stop = 10.0)
@@ -182,17 +138,17 @@ end
 
     # rot file
     file = HDF5.h5open(rot_nxs_file, "r")
-    rotMatrix = transpose(SquareMatrix3(read(file["expinfo_0"]["goniometer_0"])))
+    rotMatrix = transpose(SquareMatrix3C(read(file["expinfo_0"]["goniometer_0"])))
 
-    symm = Vector{SquareMatrix3}()
+    symm = Vector{SquareMatrix3C}()
     symmGroup = file["symmetryOps"]
     for i = 1:length(symmGroup)
         push!(symm, transpose(read(symmGroup["op_" * string(i - 1)])))
     end
 
-    m_UB = transpose(SquareMatrix3(read(file["ubmatrix"])))
+    m_UB = transpose(SquareMatrix3C(read(file["ubmatrix"])))
     close(file)
-    m_W = SquareMatrix3([1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
+    m_W = SquareMatrix3C([1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
 
     # sa file
     file = HDF5.h5open(sa_nxs_file, "r")
@@ -322,7 +278,7 @@ end
     transforms = JACC.Vector(map(op -> inv(rotMatrix * m_UB * op * m_W), symm))
     nSymm::SizeType = length(symm)
     maxIx = maxIntersections(doctest)
-    intersections = [PreallocVector(Vector{Vec4}(undef, maxIx)) for i = 1:ndets]
+    intersections = [PreallocVector(Vector{Crd4}(undef, maxIx)) for i = 1:ndets]
     yValues = [PreallocVector(Vector{ScalarType}(undef, maxIx)) for i = 1:ndets]
     iPerm = [PreallocVector([n for n = 1:maxIx]) for i = 1:ndets]
 
@@ -390,17 +346,23 @@ end
 
     h = Hist3(x, y, z)
 
-    @time begin
-        JACC.parallel_for(
-            (nSymm, size(events)[2]),
-            (n, i, t) -> begin
-                op = t.transforms[n]
-                v = op * V3[t.events[6, i], t.events[7, i], t.events[8, i]]
-                atomic_push!(t.h, v[1], v[2], v[3], t.events[1, i])
-            end,
-            (h = h, events, transforms),
-        )
+    function launch_kernel2()
+        @time begin
+            JACC.parallel_for(
+                (nSymm, size(events)[2]),
+                (n, i, t) -> begin
+                    op = t.transforms[n]
+                    v::Crd3 = op * C3[t.events[6, i], t.events[7, i], t.events[8, i]]
+                    atomic_push!(t.h, v[1], v[2], v[3], t.events[1, i])
+                end,
+                (h = h, events, transforms),
+            )
+        end
     end
+    launch_kernel2()
+    # Profile.clear()
+    # Profile.@profile launch_kernel2()
+    # statprofilehtml()
 
     fio = open("meow.txt", "w")
     for j = 1:dims[2]
