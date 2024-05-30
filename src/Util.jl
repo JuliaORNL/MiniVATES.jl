@@ -14,26 +14,26 @@ end
 const SignalType = Float32
 const CoordType = Float32
 const ScalarType = Float32
+const SizeType = Int
 
 const Vector3{T} = StaticArrays.SVector{3,T} where {T}
+@inline Vector3{T}() where {T} = Vector3{T}(0, 0, 0)
 const Vector4{T} = StaticArrays.SVector{4,T} where {T}
 
 const Vec3 = Vector3{ScalarType}
-@inline Vec3() = Vec3(0, 0, 0)
+# @inline Vec3() = Vec3(0, 0, 0)
 const V3 = StaticArrays.SA{ScalarType}
 const Vec4 = Vector4{ScalarType}
 const V4 = StaticArrays.SA{ScalarType}
 
 const Crd3 = Vector3{CoordType}
-@inline Crd3() = Crd3(0, 0, 0)
+# @inline Crd3() = Crd3(0, 0, 0)
 const Crd4 = Vector4{CoordType}
 const C3 = StaticArrays.SA{CoordType}
 const C4 = StaticArrays.SA{CoordType}
 
-# const SizeType = UInt64
-const SizeType = Int
-const Id3 = StaticArrays.SVector{3,SizeType}
-@inline Id3() = Vec3(0, 0, 0)
+const Id3 = Vector3{SizeType}
+# @inline Id3() = Vec3(0, 0, 0)
 const I3 = StaticArrays.SA{SizeType}
 
 function setUpIndexMaker(indexMax::Id3)
