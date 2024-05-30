@@ -54,6 +54,8 @@ mutable struct Hist3_Cust
     end
 end
 
+@inline nbins(h::Hist3_Cust) = h.nbins
+
 @inline function reset!(h::Hist3_Cust)
     h.weights = zeros(SignalType, h.nbins)
 end

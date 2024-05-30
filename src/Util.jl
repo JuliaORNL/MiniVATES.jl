@@ -21,19 +21,16 @@ const Vector3{T} = StaticArrays.SVector{3,T} where {T}
 const Vector4{T} = StaticArrays.SVector{4,T} where {T}
 
 const Vec3 = Vector3{ScalarType}
-# @inline Vec3() = Vec3(0, 0, 0)
 const V3 = StaticArrays.SA{ScalarType}
 const Vec4 = Vector4{ScalarType}
 const V4 = StaticArrays.SA{ScalarType}
 
 const Crd3 = Vector3{CoordType}
-# @inline Crd3() = Crd3(0, 0, 0)
 const Crd4 = Vector4{CoordType}
 const C3 = StaticArrays.SA{CoordType}
 const C4 = StaticArrays.SA{CoordType}
 
 const Id3 = Vector3{SizeType}
-# @inline Id3() = Vec3(0, 0, 0)
 const I3 = StaticArrays.SA{SizeType}
 
 function setUpIndexMaker(indexMax::Id3)
@@ -53,6 +50,7 @@ const SquareMatrix3c = SquareMatrix3{CoordType}
 const Array1 = JACC.Array{T,1} where {T}
 @inline Array1{T}(n::Int64) where {T} = Array1{T}(undef, n)
 const Array1r = Array1{ScalarType}
+const Array1c = Array1{CoordType}
 
 const Array2 = JACC.Array{T,2} where {T}
 @inline Array2{T}(m::Int64, n::Int64) where {T} = Array2{T}(undef, m, n)

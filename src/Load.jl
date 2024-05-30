@@ -155,17 +155,22 @@ end
 end
 
 @inline function _getEventsDataset(ws::EventWorkspace)
-    return ws.file["MDEventWorkspace"]["event_data"]["event_data"]
+    ds = ws.file["MDEventWorkspace"]["event_data"]["event_data"]
+    dims, _ = HDF5.get_extent_dims(ds)
+    @assert length(dims) == 2
+    @assert dims[1] == 8
+    return ds
 end
 
-@inline function updateEvents!(events::Matrix{CoordType}, ws::EventWorkspace)
-    # FIXME: need to resize based on dataset
-    # need events to be Vector{SVector{8}}
+@inline function updateEvents!(eventsMat::Array2c, ws::EventWorkspace)
     ds = _getEventsDataset(ws)
-    dims = HDF5.get_extent_dims(ds)
-    @show dims
-    # copyto!(events, _getEventsDataset(ws))
-    events = getEvents(ws)
+    dims, _ = HDF5.get_extent_dims(ds)
+    if dims[2] > size(eventsMat)[2]
+        eventsMat = Array2c(undef, dims)
+    end
+    events = view(eventsMat, :, 1:dims[2])
+    copyto!(events, _getEventsDataset(ws))
+    return (eventsMat, events)
 end
 
 @inline function getEvents(ws::EventWorkspace)
@@ -176,10 +181,11 @@ mutable struct EventData
     lowValues::Vector{CoordType}
     highValues::Vector{CoordType}
     protonCharge::ScalarType
-    thetaValues::Array1{CoordType}
-    phiValues::Array1{CoordType}
+    thetaValues::Array1c
+    phiValues::Array1c
     detIDs::Vector{SizeType}
-    events::Matrix{CoordType}
+    eventsCtnr::Array2c
+    events::SubArray
 end
 
 function loadEventData(event_nxs_file::AbstractString)
@@ -231,6 +237,7 @@ function loadEventData(event_nxs_file::AbstractString)
             phiValues,
             detIDs,
             events,
+            view(events, :, :),
         )
     end
 end

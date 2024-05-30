@@ -95,7 +95,9 @@ end
     iPerm = [PreallocVector([n for n = 1:maxIx]) for i = 1:ndets]
     yValues = [PreallocVector(Vector{ScalarType}(undef, maxIx)) for i = 1:ndets]
 
+    println("file numbers: (", benzil_event_nxs_min, ", ", benzil_event_nxs_max, ")")
     for file_num = benzil_event_nxs_min:benzil_event_nxs_max
+        println("file ", file_num, " / ", )
         fNumStr = string(file_num)
         rotFile = benzil_event_nxs_prefix * fNumStr * "_extra_params.hdf5"
         let extrasWS = MiniVATES.ExtrasWorkspace(rotFile)
@@ -105,7 +107,8 @@ end
         eventFile = benzil_event_nxs_prefix * fNumStr * "_BEFORE_MDNorm.nxs"
         let eventWS = MiniVATES.EventWorkspace(eventFile)
             eventData.protonCharge = MiniVATES.getProtonCharge(eventWS)
-            MiniVATES.updateEvents!(eventData.events, eventWS)
+            @time eventData.eventsCtnr, eventData.events =
+                MiniVATES.updateEvents!(eventData.eventsCtnr, eventWS)
         end
 
         transforms = MiniVATES.makeRotationTransforms(exData, m_W)
@@ -146,10 +149,11 @@ end
     end
 
     open("meow.txt", "w") do fio
-        outWts = binweights(h)
-        meowWts = binweights(signal)
-        for j = 1:dims[2]
-            for i = 1:dims[1]
+        outWts = MiniVATES.binweights(h)
+        meowWts = MiniVATES.binweights(signal)
+        nbins = MiniVATES.nbins(signal)
+        for j = 1:nbins[2]
+            for i = 1:nbins[1]
                 println(fio, outWts[i, j, 1] / meowWts[i, j, 1])
             end
         end

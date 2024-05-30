@@ -1,4 +1,4 @@
-function binEvents!(h::Hist3, events::Array2c, transforms)
+function binEvents!(h::Hist3, events::SubArray, transforms)
     JACC.parallel_for(
         (length(transforms), size(events)[2]),
         (n, i, t) -> begin

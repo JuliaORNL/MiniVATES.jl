@@ -4,7 +4,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 
 Z = np.loadtxt('meow.txt')
-Z = np.reshape(Z,(200,200))
+Z = np.reshape(Z,(603,603))
 
 fig, ax = plt.subplots()
 im = ax.imshow(Z, interpolation='none', cmap=cm.viridis,
