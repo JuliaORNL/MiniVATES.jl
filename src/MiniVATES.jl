@@ -20,6 +20,8 @@ end
 
 include("Util.jl")
 include("Hist.jl")
+include("BinMD.jl")
+include("Load.jl")
 include("MDNorm.jl")
 
-end 
+end

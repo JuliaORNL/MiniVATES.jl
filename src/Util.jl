@@ -54,6 +54,10 @@ const Array1 = JACC.Array{T,1} where {T}
 @inline Array1{T}(n::Int64) where {T} = Array1{T}(undef, n)
 const Array1r = Array1{ScalarType}
 
+const Array2 = JACC.Array{T,2} where {T}
+@inline Array2{T}(m::Int64, n::Int64) where {T} = Array2{T}(undef, m, n)
+const Array2c = Array2{CoordType}
+
 mutable struct PreallocVector{T} <: AbstractVector{T}
     data::Vector{T}
     # maxIdx::SizeType
