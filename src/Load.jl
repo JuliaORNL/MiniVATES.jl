@@ -44,6 +44,8 @@ function loadExtrasData(rot_nxs_file::AbstractString)
     end
 end
 
+@inline ndet(extrasData::ExtrasData) = length(extrasData.skip_dets)
+
 @inline function makeRotationTransforms(d::ExtrasData, m_W::SquareMatrix3c)
     return Array1(map(op -> inv(d.rotMatrix * d.m_UB * op * m_W), d.symm))
 end

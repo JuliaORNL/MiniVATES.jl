@@ -54,6 +54,8 @@ mutable struct Hist3_Cust
     end
 end
 
+@inline edges(h::Hist3_Cust) = h.edges
+
 @inline nbins(h::Hist3_Cust) = h.nbins
 
 @inline function reset!(h::Hist3_Cust)

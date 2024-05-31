@@ -1,5 +1,12 @@
 import Base: @propagate_inbounds
 
+@inline function _maxIntersections(hX, kX, lX)
+    hNPts = length(hX)
+    kNPts = length(kX)
+    lNPts = length(lX)
+    return hNPts + kNPts + lNPts + 2
+end
+
 mutable struct MDNorm{TArray}
     hX::TArray
     kX::TArray
@@ -9,9 +16,23 @@ mutable struct MDNorm{TArray}
     # boxLength::Crd3
     # indexMax::Id3
     # indexMaker::Id3
+    extrasData::ExtrasData
+    intersections::Vector{PreallocVector{Crd4}}
+    iPerm::Vector{PreallocVector{SizeType}}
+    yValues::Vector{PreallocVector{ScalarType}}
 
-    function MDNorm(hx::TArray, kx::TArray, lx::TArray) where {TArray}
+    function MDNorm(
+        hx::TArray,
+        kx::TArray,
+        lx::TArray,
+        extrasData::ExtrasData,
+    ) where {TArray}
         indexMax = I3[length(hx) - 1, length(kx) - 1, length(lx) - 1]
+        maxIx = _maxIntersections(hx, kx, lx)
+        ndets = ndet(extrasData)
+        intersections = [PreallocVector(Vector{Crd4}(undef, maxIx)) for i = 1:ndets]
+        iPerm = [PreallocVector([n for n = 1:maxIx]) for i = 1:ndets]
+        yValues = [PreallocVector(Vector{ScalarType}(undef, maxIx)) for i = 1:ndets]
         new{TArray}(
             hx,
             kx,
@@ -21,6 +42,10 @@ mutable struct MDNorm{TArray}
             # C3[hx[2] - hx[1], kx[2] - kx[1], lx[2] - lx[1]],
             # indexMax,
             # setUpIndexMaker(indexMax),
+            extrasData,
+            intersections,
+            iPerm,
+            yValues,
         )
     end
 end
@@ -29,16 +54,106 @@ function MDNorm()
     MDNorm(Array1r(), Array1r(), Array1r())
 end
 
-# function MDNorm(hx::Vector, kx::Vector, lx::Vector)
-#     MDNorm(Array1r(hx), Array1r(kx), Array1r(lx))
-# end
-
-@inline function maxIntersections(mdn::MDNorm)
-    hNPts = length(mdn.hX)
-    kNPts = length(mdn.kX)
-    lNPts = length(mdn.lX)
-    return hNPts + kNPts + lNPts + 2
+function MDNorm(
+    hx::AbstractRange,
+    kx::AbstractRange,
+    lx::AbstractRange,
+    extrasData::ExtrasData,
+)
+    MDNorm(collect(hx), collect(kx), collect(lx), extrasData)
 end
+
+function MDNorm(hist::Hist3, extrasData::ExtrasData)
+    MDNorm(edges(hist)..., extrasData)
+end
+
+function _mdnorm_kernel(i, t)
+    @inbounds begin
+        if t.skip_dets[i]
+            return nothing
+        end
+
+        detID = t.detIDs[i]
+        wsIdx = get(t.fluxDetToIdx, detID, nothing)
+        if wsIdx == nothing
+            return nothing
+        end
+
+        sortedIntersections = MiniVATES.calculateIntersections!(
+            t.mdn,
+            t.signal,
+            t.thetaValues[i],
+            t.phiValues[i],
+            t.transform,
+            t.lowValues[i],
+            t.highValues[i],
+            t.intersections[i],
+            t.iPerm[i],
+        )
+
+        if isempty(sortedIntersections)
+            return nothing
+        end
+
+        MiniVATES.calculateDiffractionIntersectionIntegral!(
+            sortedIntersections,
+            t.integrFlux_x,
+            t.integrFlux_y[wsIdx],
+            t.yValues[i],
+        )
+
+        saIdx = t.solidAngDetToIdx[detID]
+        saFactor = t.solidAngleWS[saIdx][1]
+        solid::ScalarType = t.protonCharge * saFactor
+
+        MiniVATES.calculateSingleDetectorNorm!(
+            t.mdn,
+            sortedIntersections,
+            solid,
+            t.yValues[i],
+            t.signal,
+        )
+
+        return nothing
+    end
+end
+
+@inline function (mdn::MDNorm)(
+    saData::SolidAngleData,
+    fluxData::FluxData,
+    eventData::EventData,
+    signal::Hist3,
+    transforms,
+)
+    for n = 1:length(transforms)
+        JACC.parallel_for(
+            fluxData.ndets,
+            _mdnorm_kernel,
+            (
+                transform = transforms[n],
+                skip_dets = mdn.extrasData.skip_dets,
+                mdn,
+                mdn.intersections,
+                mdn.iPerm,
+                mdn.yValues,
+                signal,
+                eventData.detIDs,
+                eventData.thetaValues,
+                eventData.phiValues,
+                eventData.lowValues,
+                eventData.highValues,
+                fluxData.fluxDetToIdx,
+                fluxData.integrFlux_x,
+                fluxData.integrFlux_y,
+                saData.solidAngDetToIdx,
+                saData.solidAngleWS,
+                eventData.protonCharge,
+            ),
+        )
+    end
+end
+
+@inline maxIntersections(mdn::MDNorm) = _maxIntersections(mdn.hX, mdn.kX, mdn.lX)
 
 """
     calculateIntersections!() -> Vector{Crd4}
