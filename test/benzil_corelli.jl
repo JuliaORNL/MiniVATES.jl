@@ -1,4 +1,5 @@
 include("test_data_constants.jl")
+include("common.jl")
 
 import MiniVATES
 import MiniVATES: ScalarType, CoordType
@@ -29,8 +30,8 @@ import Test: @testset
     eventFile = benzil_event_nxs_prefix * "0_BEFORE_MDNorm.nxs"
     eventData = MiniVATES.loadEventData(eventFile)
 
-    m_W = SquareMatrix3c([1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
-    transforms2 = MiniVATES.makeTransforms(exData, m_W)
+    MiniVATES.set_m_W!(exData, [1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
+    transforms2 = MiniVATES.makeTransforms(exData)
 
     doctest = MiniVATES.MDNorm(signal, exData)
 
@@ -50,21 +51,12 @@ import Test: @testset
                 MiniVATES.updateEvents!(eventData.eventsCtnr, eventWS)
         end
 
-        transforms = MiniVATES.makeRotationTransforms(exData, m_W)
+        transforms = MiniVATES.makeRotationTransforms(exData)
 
         @time doctest(saData, fluxData, eventData, signal, transforms)
 
         @time MiniVATES.binEvents!(h, eventData.events, transforms2)
     end
 
-    open("meow.txt", "w") do fio
-        outWts = MiniVATES.binweights(h)
-        meowWts = MiniVATES.binweights(signal)
-        nbins = MiniVATES.nbins(signal)
-        for j = 1:nbins[2]
-            for i = 1:nbins[1]
-                println(fio, outWts[i, j, 1] / meowWts[i, j, 1])
-            end
-        end
-    end
+    write_cat(signal, h)
 end

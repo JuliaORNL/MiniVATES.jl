@@ -1,3 +1,5 @@
+include("common.jl")
+
 import MiniVATES
 import MiniVATES: ScalarType, CoordType
 import MiniVATES: SquareMatrix3c, Crd4
@@ -28,9 +30,9 @@ import StatProfilerHTML: statprofilehtml
     # event file
     eventData = MiniVATES.loadEventData(event_nxs_file)
 
-    m_W = SquareMatrix3c([1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
-    transforms = MiniVATES.makeRotationTransforms(exData, m_W)
-    transforms2 = MiniVATES.makeTransforms(exData, m_W)
+    MiniVATES.set_m_W!(exData, [1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
+    transforms = MiniVATES.makeRotationTransforms(exData)
+    transforms2 = MiniVATES.makeTransforms(exData)
 
     doctest = MiniVATES.MDNorm(x, y, z, exData)
 
@@ -77,11 +79,5 @@ import StatProfilerHTML: statprofilehtml
     # Profile.@profile launch_kernel2()
     # statprofilehtml()
 
-    open("meow.txt", "w") do fio
-        for j = 1:dims[2]
-            for i = 1:dims[1]
-                println(fio, binweights(h)[i, j, 1] / binweights(signal)[i, j, 1])
-            end
-        end
-    end
+    write_cat(signal, h)
 end

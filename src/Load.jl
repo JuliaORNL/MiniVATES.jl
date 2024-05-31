@@ -32,6 +32,17 @@ mutable struct ExtrasData
     rotMatrix::SquareMatrix3c
     symm::Vector{SquareMatrix3c}
     m_UB::SquareMatrix3c
+    m_W::SquareMatrix3c
+
+    function ExtrasData(skip_dets, rotMatrix, symm, m_UB)
+        m_W = SquareMatrix3c([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+        new(skip_dets, rotMatrix, symm, m_UB, m_W)
+    end
+end
+
+function set_m_W!(extrasData::ExtrasData, m_W)
+    extrasData.m_W = SquareMatrix3c(m_W)
+    return extrasData.m_W
 end
 
 function loadExtrasData(rot_nxs_file::AbstractString)
@@ -46,12 +57,12 @@ end
 
 @inline ndet(extrasData::ExtrasData) = length(extrasData.skip_dets)
 
-@inline function makeRotationTransforms(d::ExtrasData, m_W::SquareMatrix3c)
-    return Array1(map(op -> inv(d.rotMatrix * d.m_UB * op * m_W), d.symm))
+@inline function makeRotationTransforms(d::ExtrasData)
+    return Array1(map(op -> inv(d.rotMatrix * d.m_UB * op * d.m_W), d.symm))
 end
 
-@inline function makeTransforms(d::ExtrasData, m_W::SquareMatrix3c)
-    return Array1(map(op -> inv(d.m_UB * op * m_W), d.symm))
+@inline function makeTransforms(d::ExtrasData)
+    return Array1(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
 end
 
 struct SolidAngleData

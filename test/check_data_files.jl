@@ -28,3 +28,6 @@ if !ispath(benzil_data_dir)
     create_link(benzil_data_dir)
 end
 
+if !ispath(garnet_data_dir)
+    create_link(garnet_data_dir)
+end

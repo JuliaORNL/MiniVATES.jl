@@ -16,3 +16,9 @@ const benzil_sa_nxs_file = joinpath(benzil_data_dir, "SolidAngle20160720NoCC.nxs
 const benzil_flux_nxs_file = joinpath(benzil_data_dir, "Spectrum20160720NoCC.nxs")
 const benzil_event_nxs_min = 0
 const benzil_event_nxs_max = 35
+
+const garnet_data_dir = joinpath(test_data_dir, "garnet")
+const garnet_rot_nxs_file = joinpath(garnet_data_dir, "CORELLI_extra_params.hdf5")
+const garnet_flux_nxs_file = joinpath(garnet_data_dir, "flux_2p5-8.nxs")
+const garnet_sa_nxs_file = joinpath(garnet_data_dir, "solid_angle_2p5-8.nxs")
+const garnet_event_nxs_file = joinpath(garnet_data_dir, "CORELLI_BEFORE_MDNorm.nxs")

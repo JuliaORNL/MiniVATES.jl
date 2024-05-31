@@ -3,8 +3,11 @@ import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 
+with open('purr.txt') as f:
+    shape = [int(line) for line in f.readlines()]
+
 Z = np.loadtxt('meow.txt')
-Z = np.reshape(Z,(603,603))
+Z = np.reshape(Z,shape)
 
 fig, ax = plt.subplots()
 im = ax.imshow(Z, interpolation='none', cmap=cm.viridis,
