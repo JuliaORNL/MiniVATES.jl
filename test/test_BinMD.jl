@@ -1,7 +1,7 @@
 include("test_data_constants.jl")
+include("common.jl")
 
 import MiniVATES
-import MiniVATES: Hist3
 import Test: @testset
 
 @testset "BinMD" begin
@@ -19,12 +19,17 @@ import Test: @testset
     end
 
     @show rotFile
-    exData = MiniVATES.loadExtrasData(rotFile)
-    eventData = MiniVATES.loadEventData(eventFile)
+    @show eventFile
+    transforms2 = MiniVATES.makeTransforms(MiniVATES.loadExtrasData(rotFile))
+    events = MiniVATES.getEvents(MiniVATES.EventWorkspace(eventFile))
 
-    transforms2 = MiniVATES.makeTransforms(exData)
-
-    @time MiniVATES.binEvents!(h, eventData.events, transforms2)
+    # try
+        @time MiniVATES.binEvents!(h, events, transforms2)
+    # catch err
+    #     code_warntype(err; interactive = true)
+    # end
     MiniVATES.reset!(h)
-    @time MiniVATES.binEvents!(h, eventData.events, transforms2)
+    @time MiniVATES.binEvents!(h, events, transforms2)
+
+    write_cat(h)
 end

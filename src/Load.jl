@@ -1,4 +1,6 @@
 import HDF5
+import JACC
+import Adapt: adapt_structure
 
 struct ExtrasWorkspace
     file::HDF5.File
@@ -63,6 +65,7 @@ end
 
 @inline function makeTransforms(d::ExtrasData)
     return Array1(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
+    # return Array1{SquareMatrix3c}(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
 end
 
 struct SolidAngleData
@@ -175,7 +178,7 @@ end
     return ds
 end
 
-@inline function updateEvents!(eventsMat::Array2c, ws::EventWorkspace)
+@inline function updateEvents!(events::SubArray, ws::EventWorkspace)
     ds = _getEventsDataset(ws)
     dims, _ = HDF5.get_extent_dims(ds)
     if dims[2] > size(eventsMat)[2]
@@ -183,11 +186,11 @@ end
     end
     events = view(eventsMat, :, 1:dims[2])
     copyto!(events, _getEventsDataset(ws))
-    return (eventsMat, events)
+    return adapt_structure(JACC.Array, events)
 end
 
 @inline function getEvents(ws::EventWorkspace)
-    return read(_getEventsDataset(ws))
+    return adapt_structure(JACC.Array, view(read(_getEventsDataset(ws)), :, :))
 end
 
 mutable struct EventData
@@ -197,7 +200,6 @@ mutable struct EventData
     thetaValues::Array1c
     phiValues::Array1c
     detIDs::Vector{SizeType}
-    eventsCtnr::Array2c
     events::SubArray
 end
 
@@ -250,7 +252,6 @@ function loadEventData(event_nxs_file::AbstractString)
             phiValues,
             detIDs,
             events,
-            view(events, :, :),
         )
     end
 end

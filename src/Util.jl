@@ -41,7 +41,7 @@ function setUpIndexMaker(indexMax::Id3)
     return out
 end
 
-const SquareMatrix3{T} = StaticArrays.SMatrix{3,3,T} where {T}
+const SquareMatrix3{T} = StaticArrays.SMatrix{3,3,T,9} where {T}
 @inline SquareMatrix3{T}() where {T} = zeros(SquareMatrix3{T})
 
 const SquareMatrix3r = SquareMatrix3{ScalarType}
