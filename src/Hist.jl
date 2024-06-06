@@ -1,64 +1,40 @@
-import FHist
 import Atomix
+import Adapt
 import Base: @propagate_inbounds
 
-###
-
-struct Hist3_FHist
-    impl::FHist.Hist3D
-
-    function Hist3_FHist(x::AbstractArray, y::AbstractArray, z::AbstractArray)
-        new(FHist.Hist3D(counttype = SignalType, binedges = (x, y, z)))
-    end
-end
-
-@inline function atomic_push!(h::Hist3_FHist, x, y, z, wt)
-    FHist.atomic_push!(h.impl, x, y, z, wt)
-end
-
-@inline binweights(h::Hist3_FHist) = FHist.bincounts(h.impl)
-
-@inline function binindex1d(r, val)
-    if !(first(r) <= val)
-        return 0
-    elseif !(val <= last(r))
-        return length(r)
-    else
-        return searchsortedlast(r, val)
-    end
-end
-
-@inline function binindex(h::Hist3_FHist, x, y, z)
-    rx, ry, rz = FHist.binedges(h.impl)
-    return (binindex1d(rx, x), binindex1d(ry, y), binindex1d(rz, z))
-end
-
-###
-
-mutable struct Hist3_Cust
-    edges::NTuple{3,Vector{CoordType}}
+struct Hist3{TArray1, TArray3}
+    edges::NTuple{3,TArray1}
     nbins::NTuple{3,SizeType}
     origin::Vector3{CoordType}
     boxLength::Vector3{CoordType}
-    weights::Array{SignalType,3}
-
-    function Hist3_Cust(x::AbstractArray, y::AbstractArray, z::AbstractArray)
-        nbins = (length(x) - 1, length(y) - 1, length(z) - 1)
-        new(
-            (x, y, z),
-            nbins,
-            V3[x[1], y[1], z[1]],
-            V3[x[2] - x[1], y[2] - y[1], z[2] - z[1]],
-            zeros(SignalType, nbins),
-        )
-    end
+    weights::TArray3
 end
 
-@inline function reset!(h::Hist3_Cust)
-    h.weights = zeros(SignalType, h.nbins)
+function Hist3(x::AbstractArray, y::AbstractArray, z::AbstractArray)
+    nbins = (length(x) - 1, length(y) - 1, length(z) - 1)
+    Hist3(
+               (Array1(x), Array1(y), Array1(z)),
+        nbins,
+        V3[x[1], y[1], z[1]],
+        V3[x[2] - x[1], y[2] - y[1], z[2] - z[1]],
+        JACC.Array{SignalType,3}(undef, nbins),
+        # zeros(SignalType, nbins),
+    )
 end
 
-@propagate_inbounds function binindex1d(h::Hist3_Cust, d::SizeType, crd::CoordType)
+Adapt.@adapt_structure Hist3
+
+@inline edges(h::Hist3) = h.edges
+
+@inline nbins(h::Hist3) = h.nbins
+
+@inline binweights(h::Hist3) = h.weights
+
+@inline function reset!(h::Hist3)
+    fill!(h.weights, 0.0)
+end
+
+@propagate_inbounds function binindex1d(h::Hist3, d::SizeType, crd::CoordType)
     dist = crd - h.origin[d]
     if dist < 0.0
         return 0
@@ -73,7 +49,7 @@ end
 end
 
 @propagate_inbounds function binindex(
-    h::Hist3_Cust,
+    h::Hist3,
     x::CoordType,
     y::CoordType,
     z::CoordType,
@@ -81,12 +57,12 @@ end
     return (binindex1d(h, 1, x), binindex1d(h, 2, y), binindex1d(h, 3, z))
 end
 
-@propagate_inbounds function binindex(h::Hist3_Cust, x, y, z)
-    return binindex(h, convert(CoordType, x), convert(CoordType, y), convert(CoordType, z))
-end
+# @propagate_inbounds function binindex(h::Hist3, x, y, z)
+#     return binindex(h, convert(CoordType, x), convert(CoordType, y), convert(CoordType, z))
+# end
 
 @propagate_inbounds function atomic_push!(
-    h::Hist3_Cust,
+    h::Hist3,
     x::CoordType,
     y::CoordType,
     z::CoordType,
@@ -99,9 +75,3 @@ end
     end
 end
 
-@inline binweights(h::Hist3_Cust) = h.weights
-
-###
-
-# const Hist3 = Hist3_FHist
-const Hist3 = Hist3_Cust

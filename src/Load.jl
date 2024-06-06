@@ -1,39 +1,79 @@
 import HDF5
+import JACC
+import Adapt: adapt_structure
 
-struct RotationData
+struct ExtrasWorkspace
+    file::HDF5.File
+
+    ExtrasWorkspace(filename::AbstractString) = new(HDF5.h5open(filename, "r"))
+end
+
+@inline function getSkipDets(ws::ExtrasWorkspace)
+    return read(ws.file["skip_dets"])
+end
+
+@inline function getRotationMatrix(ws::ExtrasWorkspace)
+    return transpose(SquareMatrix3c(read(ws.file["expinfo_0"]["goniometer_0"])))
+end
+
+@inline function getSymmMatrices(ws::ExtrasWorkspace)
+    symm = Vector{SquareMatrix3c}()
+    symmGroup = ws.file["symmetryOps"]
+    for i = 1:length(symmGroup)
+        push!(symm, transpose(read(symmGroup["op_" * string(i - 1)])))
+    end
+    return symm
+end
+
+@inline function getUBMatrix(ws::ExtrasWorkspace)
+    return transpose(SquareMatrix3c(read(ws.file["ubmatrix"])))
+end
+
+mutable struct ExtrasData
+    skip_dets::Vector{Bool}
     rotMatrix::SquareMatrix3c
     symm::Vector{SquareMatrix3c}
     m_UB::SquareMatrix3c
     m_W::SquareMatrix3c
-end
 
-function loadRotationData(rot_nxs_file::AbstractString)
-    HDF5.h5open(rot_nxs_file, "r") do file
-        rotMatrix = transpose(SquareMatrix3c(read(file["expinfo_0"]["goniometer_0"])))
-
-        symm = Vector{SquareMatrix3c}()
-        symmGroup = file["symmetryOps"]
-        for i = 1:length(symmGroup)
-            push!(symm, transpose(read(symmGroup["op_" * string(i - 1)])))
-        end
-
-        m_UB = transpose(SquareMatrix3c(read(file["ubmatrix"])))
-        m_W = SquareMatrix3c([1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
-
-        return RotationData(rotMatrix, symm, m_UB, m_W)
+    function ExtrasData(skip_dets, rotMatrix, symm, m_UB)
+        m_W = SquareMatrix3c([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+        new(skip_dets, rotMatrix, symm, m_UB, m_W)
     end
 end
 
-@inline function makeTransforms(rd::RotationData)
-    return Array1(map(op -> inv(rd.rotMatrix * rd.m_UB * op * rd.m_W), rd.symm))
+function set_m_W!(extrasData::ExtrasData, m_W)
+    extrasData.m_W = SquareMatrix3c(m_W)
+    return extrasData.m_W
 end
 
-struct SAData
+function loadExtrasData(rot_nxs_file::AbstractString)
+    let ws = ExtrasWorkspace(rot_nxs_file)
+        skip_dets = getSkipDets(ws)
+        rotMatrix = getRotationMatrix(ws)
+        symm = getSymmMatrices(ws)
+        m_UB = getUBMatrix(ws)
+        return ExtrasData(skip_dets, rotMatrix, symm, m_UB)
+    end
+end
+
+@inline ndet(extrasData::ExtrasData) = length(extrasData.skip_dets)
+
+@inline function makeRotationTransforms(d::ExtrasData)
+    return Array1(map(op -> inv(d.rotMatrix * d.m_UB * op * d.m_W), d.symm))
+end
+
+@inline function makeTransforms(d::ExtrasData)
+    return Array1(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
+    # return Array1{SquareMatrix3c}(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
+end
+
+struct SolidAngleData
     solidAngleWS::Vector{Vector{ScalarType}}
     solidAngDetToIdx::Dict{Int32,SizeType}
 end
 
-function loadSAData(sa_nxs_file::AbstractString)
+function loadSolidAngleData(sa_nxs_file::AbstractString)
     HDF5.h5open(sa_nxs_file, "r") do file
         saGroup = file["mantid_workspace_1"]
         saData = read(saGroup["workspace"]["values"])
@@ -60,7 +100,7 @@ function loadSAData(sa_nxs_file::AbstractString)
             idx += 1
         end
 
-        return SAData(solidAngleWS, solidAngDetToIdx)
+        return SolidAngleData(solidAngleWS, solidAngDetToIdx)
     end
 end
 
@@ -117,19 +157,55 @@ function loadFluxData(flux_nxs_file::AbstractString)
     end
 end
 
-mutable struct EventsData
+struct EventWorkspace
+    file::HDF5.File
+
+    EventWorkspace(filename::AbstractString) = new(HDF5.h5open(filename, "r"))
+end
+
+@inline function getProtonCharge(ws::EventWorkspace)
+    expGroup = ws.file["MDEventWorkspace"]["experiment0"]
+    pcData = read(expGroup["logs"]["gd_prtn_chrg"]["value"])
+    @assert size(pcData) == (1,)
+    protonCharge = pcData[1]
+end
+
+@inline function _getEventsDataset(ws::EventWorkspace)
+    ds = ws.file["MDEventWorkspace"]["event_data"]["event_data"]
+    dims, _ = HDF5.get_extent_dims(ds)
+    @assert length(dims) == 2
+    @assert dims[1] == 8
+    return ds
+end
+
+@inline function updateEvents!(events::SubArray, ws::EventWorkspace)
+    ds = _getEventsDataset(ws)
+    dims, _ = HDF5.get_extent_dims(ds)
+    if dims[2] > size(eventsMat)[2]
+        eventsMat = Array2c(undef, dims)
+    end
+    events = view(eventsMat, :, 1:dims[2])
+    copyto!(events, _getEventsDataset(ws))
+    return adapt_structure(JACC.Array, events)
+end
+
+@inline function getEvents(ws::EventWorkspace)
+    return adapt_structure(JACC.Array, view(read(_getEventsDataset(ws)), :, :))
+end
+
+mutable struct EventData
     lowValues::Vector{CoordType}
     highValues::Vector{CoordType}
     protonCharge::ScalarType
-    thetaValues::Vector{CoordType}
-    phiValues::Vector{CoordType}
+    thetaValues::Array1c
+    phiValues::Array1c
     detIDs::Vector{SizeType}
-    events::Matrix{CoordType}
+    events::SubArray
 end
 
-function loadEventsData(event_nxs_file::AbstractString)
-    HDF5.h5open(event_nxs_file, "r") do file
-        expGroup = file["MDEventWorkspace"]["experiment0"]
+function loadEventData(event_nxs_file::AbstractString)
+    let ws = EventWorkspace(event_nxs_file)
+        expGroup = ws.file["MDEventWorkspace"]["experiment0"]
         lowValues = read(expGroup["logs"]["MDNorm_low"]["value"])
         dims = size(lowValues)
         @assert length(dims) == 1
@@ -139,29 +215,36 @@ function loadEventsData(event_nxs_file::AbstractString)
         @assert length(dims) == 1
         @assert dims[1] == dataSize
 
-        pcData = read(expGroup["logs"]["gd_prtn_chrg"]["value"])
-        @assert size(pcData) == (1,)
-        protonCharge = pcData[1]
+        protonCharge = getProtonCharge(ws)
 
         detGroup = expGroup["instrument"]["physical_detectors"]
-        thetaData::Vector{CoordType} = read(detGroup["polar_angle"])
+        thetaData::Array1{CoordType} = read(detGroup["polar_angle"])
         dims = size(thetaData)
         @assert length(dims) == 1
         @assert dims[1] == dataSize
-        thetaValues = map(deg2rad, thetaData)
 
-        phiData::Vector{CoordType} = read(detGroup["azimuthal_angle"])
+        phiData::Array1{CoordType} = read(detGroup["azimuthal_angle"])
         dims = size(phiData)
         @assert length(dims) == 1
         @assert dims[1] == dataSize
-        phiValues = map(deg2rad, phiData)
+
+        thetaValues = thetaData
+        phiValues = phiData
+        JACC.parallel_for(
+            dataSize,
+            (i, thetaValues, phiValues) -> begin
+                thetaValues[i] = deg2rad(thetaValues[i])
+                phiValues[i] = deg2rad(phiValues[i])
+            end,
+            thetaValues,
+            phiValues,
+        )
 
         detIDs = read(detGroup["detector_number"])
 
-        evGroup = file["MDEventWorkspace"]["event_data"]
-        events = read(evGroup["event_data"])
+        events = getEvents(ws)
 
-        return EventsData(
+        return EventData(
             lowValues,
             highValues,
             protonCharge,
