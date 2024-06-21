@@ -5,11 +5,14 @@ import Adapt: adapt_structure
 struct ExtrasWorkspace
     file::HDF5.File
 
-    ExtrasWorkspace(filename::AbstractString) = new(HDF5.h5open(filename, "r"))
+    function ExtrasWorkspace(filename::AbstractString)
+        println("ExtrasWorkspace: ", filename)
+        new(HDF5.h5open(filename, "r"))
+    end
 end
 
 @inline function getSkipDets(ws::ExtrasWorkspace)
-    return read(ws.file["skip_dets"])
+    return adapt_structure(Array1, read(ws.file["skip_dets"]))
 end
 
 @inline function getRotationMatrix(ws::ExtrasWorkspace)
@@ -30,7 +33,7 @@ end
 end
 
 mutable struct ExtrasData
-    skip_dets::Vector{Bool}
+    skip_dets::Array1{Bool}
     rotMatrix::SquareMatrix3c
     symm::Vector{SquareMatrix3c}
     m_UB::SquareMatrix3c
@@ -60,7 +63,23 @@ end
 @inline ndet(extrasData::ExtrasData) = length(extrasData.skip_dets)
 
 @inline function makeRotationTransforms(d::ExtrasData)
-    return Array1(map(op -> inv(d.rotMatrix * d.m_UB * op * d.m_W), d.symm))
+    transforms = Array1{SquareMatrix3c}(undef, length(d.symm))
+    JACC.parallel_for(
+        length(d.symm),
+        (i, t) -> begin
+            t.transforms[i] = t.rotMatrix * t.m_UB * t.symm[i] * t.m_W
+        end,
+        (
+            transforms = transforms,
+            symm = adapt_structure(JACC.Array, d.symm),
+            d.rotMatrix,
+            d.m_UB,
+            d.m_W,
+        ),
+    )
+    # return Array1(map(op -> inv(d.rotMatrix * d.m_UB * op * d.m_W), d.symm))
+    # return Array1([inv(d.rotMatrix * d.m_UB * op * d.m_W) for op in d.symm])
+    return transforms
 end
 
 @inline function makeTransforms(d::ExtrasData)
@@ -68,90 +87,179 @@ end
     # return Array1{SquareMatrix3c}(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
 end
 
+struct SolidAngleWorkspace
+    file::HDF5.File
+
+    function SolidAngleWorkspace(filename::AbstractString)
+        println("SolidAngleWorkspace: ", filename)
+        new(HDF5.h5open(filename, "r"))
+    end
+end
+
+@inline function getSolidAngleValues(ws::SolidAngleWorkspace)
+    saGroup = ws.file["mantid_workspace_1"]
+    saData = read(saGroup["workspace"]["values"])
+    dims = size(saData)
+    @assert length(dims) == 2
+    @assert dims[1] == 1
+    # readData = saData[1, :]
+    # solidAngleWS = map(x -> [x], readData)
+    # return solidAngleWS
+    return adapt_structure(JACC.Array, saData[1,:])
+end
+
+@inline function getSolidAngleToIdx_Array(ws::SolidAngleWorkspace; dataSize = nothing)
+    saGroup = ws.file["mantid_workspace_1"]
+    dcData = read(saGroup["instrument"]["detector"]["detector_count"])
+    dims = size(dcData)
+    @assert length(dims) == 1
+    if dataSize != nothing
+        @assert dims[1] == dataSize
+    end
+
+    solidAngDetToIdx = Vector{SizeType}()
+    detector = 1
+    idx = 1
+    for value in dcData
+        for i = 1:value
+            push!(solidAngDetToIdx, idx)
+        end
+        idx += 1
+    end
+    return solidAngDetToIdx
+end
+
+@inline function getSolidAngleToIdx_Dict(ws::SolidAngleWorkspace; dataSize = nothing)
+    saGroup = ws.file["mantid_workspace_1"]
+    dcData = read(saGroup["instrument"]["detector"]["detector_count"])
+    dims = size(dcData)
+    @assert length(dims) == 1
+    if dataSize != nothing
+        @assert dims[1] == dataSize
+    end
+
+    solidAngDetToIdx = Dict{Int32,SizeType}()
+    detector::Int32 = 1
+    idx::SizeType = 1
+    for value in dcData
+        for i = 1:value
+            push!(solidAngDetToIdx, detector => idx)
+            detector += 1
+        end
+        idx += 1
+    end
+    return solidAngDetToIdx
+end
+
 struct SolidAngleData
-    solidAngleWS::Vector{Vector{ScalarType}}
-    solidAngDetToIdx::Dict{Int32,SizeType}
+    solidAngleValues::Array1{ScalarType}
+    solidAngDetToIdx::Array1{SizeType}
 end
 
 function loadSolidAngleData(sa_nxs_file::AbstractString)
-    HDF5.h5open(sa_nxs_file, "r") do file
-        saGroup = file["mantid_workspace_1"]
-        saData = read(saGroup["workspace"]["values"])
-        dims = size(saData)
-        @assert length(dims) == 2
-        @assert dims[1] == 1
-        dataSize = dims[2]
-        readData = saData[1, :]
-        solidAngleWS = map(x -> [x], readData)
+    let ws = SolidAngleWorkspace(sa_nxs_file)
+        solidAngleValues = getSolidAngleValues(ws)
+        len = length(solidAngleValues)
 
-        dcData = read(saGroup["instrument"]["detector"]["detector_count"])
-        dims = size(dcData)
-        @assert length(dims) == 1
-        @assert dims[1] == dataSize
+        solidAngDetToIdx = getSolidAngleToIdx_Array(ws, dataSize = len)
 
-        solidAngDetToIdx = Dict{Int32,SizeType}()
-        detector::Int32 = 1
-        idx::SizeType = 1
-        for value in dcData
-            for i = 1:value
-                push!(solidAngDetToIdx, detector => idx)
-                detector += 1
-            end
-            idx += 1
-        end
-
-        return SolidAngleData(solidAngleWS, solidAngDetToIdx)
+        return SolidAngleData(solidAngleValues, solidAngDetToIdx)
     end
+end
+
+struct FluxWorkspace
+    file::HDF5.File
+
+    function FluxWorkspace(filename::AbstractString)
+        println("FluxWorkspace: ", filename)
+        new(HDF5.h5open(filename, "r"))
+    end
+end
+
+@inline function getIntegrFlux_x(ws::FluxWorkspace)
+    group = ws.file["mantid_workspace_1"]
+    readData::Vector{ScalarType} = read(group["workspace"]["axis1"])
+    dims = size(readData)
+    @assert length(dims) == 1
+    len = dims[1]
+    ret = range(length = len, start = first(readData), stop = last(readData))
+    @assert isapprox(ret[2] - ret[1], readData[2] - readData[1], rtol = 1.0e-8)
+    return ret
+end
+
+@inline function getIntegrFlux_y(ws::FluxWorkspace)
+    group = ws.file["mantid_workspace_1"]
+    readDataY::Matrix{ScalarType} = read(group["workspace"]["values"])
+    dims = size(readDataY)
+    @assert length(dims) == 2
+    @assert dims[2] == 1
+    return adapt_structure(JACC.Array, readDataY[:, 1])
+end
+
+@inline function getFluxDetToIdx_Array(ws::FluxWorkspace)
+    group = ws.file["mantid_workspace_1"]
+    dcData = read(group["instrument"]["detector"]["detector_count"])
+    dims = size(dcData)
+    @assert length(dims) == 1
+    @assert dims[1] == 1
+    fluxDetToIdx = Vector{SizeType}()
+    detector = 1
+    idx = 1
+    for value in dcData
+        for i = 1:value
+            push!(fluxDetToIdx, idx)
+        end
+        idx += 1
+    end
+    return adapt_structure(JACC.Array, fluxDetToIdx)
+end
+
+@inline function getFluxDetToIdx_Dict(ws::FluxWorkspace)
+    group = ws.file["mantid_workspace_1"]
+    dcData = read(group["instrument"]["detector"]["detector_count"])
+    dims = size(dcData)
+    @assert dims == (1,)
+    fluxDetToIdx = Dict{Int32,SizeType}()
+    detector = 1
+    idx = 1
+    for value in dcData
+        for i = 1:value
+            push!(fluxDetToIdx, detector => idx)
+            detector += 1
+        end
+        idx += 1
+    end
+    return fluxDetToIdx
+end
+
+@inline function get_ndets(ws::FluxWorkspace)
+    group = ws.file["mantid_workspace_1"]
+    detGroup = group["instrument"]["physical_detectors"]
+    readData = read(detGroup["number_of_detectors"])
+    dims = size(readData)
+    @assert dims == (1,)
+    ndets::SizeType = readData[1]
 end
 
 struct FluxData
     integrFlux_x::AbstractRange{ScalarType}
-    integrFlux_y::Vector{Vector{ScalarType}}
-    fluxDetToIdx::Dict{Int32,SizeType}
+    integrFlux_y::Array1{ScalarType}
+    # fluxDetToIdx::Dict{Int32,SizeType}
+    fluxDetToIdx::Array1{SizeType}
     ndets::SizeType
 end
 
 function loadFluxData(flux_nxs_file::AbstractString)
-    HDF5.h5open(flux_nxs_file, "r") do file
-        group = file["mantid_workspace_1"]
-        readDataX::Vector{ScalarType} = read(group["workspace"]["axis1"])
-        dims = size(readDataX)
-        @assert length(dims) == 1
-        dataSize = dims[1]
-        integrFlux_x =
-            range(length = dataSize, start = first(readDataX), stop = last(readDataX))
-        @assert isapprox(
-            integrFlux_x[2] - integrFlux_x[1],
-            readDataX[2] - readDataX[1],
-            rtol = 1.0e-8,
-        )
+    let ws = FluxWorkspace(flux_nxs_file)
+        group = ws.file["mantid_workspace_1"]
 
-        readDataY::Matrix{ScalarType} = read(group["workspace"]["values"])
-        dims = size(readDataY)
-        @assert length(dims) == 2
-        @assert dims[2] == 1
-        integrFlux_y = [readDataY[:, 1]]
+        integrFlux_x = getIntegrFlux_x(ws)
 
-        dcData = read(group["instrument"]["detector"]["detector_count"])
-        dims = size(dcData)
-        @assert length(dims) == 1
-        @assert dims[1] == 1
-        fluxDetToIdx = Dict{Int32,SizeType}()
-        detector = 1
-        idx = 1
-        for value in dcData
-            for i = 1:value
-                push!(fluxDetToIdx, detector => idx)
-                detector += 1
-            end
-            idx += 1
-        end
+        integrFlux_y = getIntegrFlux_y(ws)
 
-        detGroup = group["instrument"]["physical_detectors"]
-        readData = read(detGroup["number_of_detectors"])
-        dims = size(readData)
-        @assert dims == (1,)
-        ndets::SizeType = readData[1]
+        fluxDetToIdx = getFluxDetToIdx_Array(ws)
+
+        ndets = get_ndets(ws)
 
         return FluxData(integrFlux_x, integrFlux_y, fluxDetToIdx, ndets)
     end
@@ -160,7 +268,10 @@ end
 struct EventWorkspace
     file::HDF5.File
 
-    EventWorkspace(filename::AbstractString) = new(HDF5.h5open(filename, "r"))
+    function EventWorkspace(filename::AbstractString)
+        println("EventWorkspace: ", filename)
+        new(HDF5.h5open(filename, "r"))
+    end
 end
 
 @inline function getProtonCharge(ws::EventWorkspace)
@@ -193,13 +304,31 @@ end
     return adapt_structure(JACC.Array, view(read(_getEventsDataset(ws)), :, :))
 end
 
+@inline function getDetIds(ws::EventWorkspace)
+    expGroup = ws.file["MDEventWorkspace"]["experiment0"]
+    detGroup = expGroup["instrument"]["physical_detectors"]
+    return adapt_structure(JACC.Array, read(detGroup["detector_number"]))
+end
+
+@inline function getLowValues(ws::EventWorkspace)
+    expGroup = ws.file["MDEventWorkspace"]["experiment0"]
+    ds = expGroup["logs"]["MDNorm_low"]["value"]
+    return adapt_structure(Array1, read(ds))
+end
+
+@inline function getHighValues(ws::EventWorkspace)
+    expGroup = ws.file["MDEventWorkspace"]["experiment0"]
+    ds = expGroup["logs"]["MDNorm_high"]["value"]
+    return adapt_structure(Array1, read(ds))
+end
+
 mutable struct EventData
-    lowValues::Vector{CoordType}
-    highValues::Vector{CoordType}
+    lowValues::Array1c
+    highValues::Array1c
     protonCharge::ScalarType
     thetaValues::Array1c
     phiValues::Array1c
-    detIDs::Vector{SizeType}
+    detIDs::Array1{SizeType}
     events::SubArray
 end
 
@@ -240,7 +369,7 @@ function loadEventData(event_nxs_file::AbstractString)
             phiValues,
         )
 
-        detIDs = read(detGroup["detector_number"])
+        detIDs = getDetIds(ws)
 
         events = getEvents(ws)
 

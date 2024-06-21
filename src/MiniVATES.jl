@@ -19,6 +19,7 @@ elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
 end
 
 include("Util.jl")
+include("Sort.jl")
 include("Hist.jl")
 include("BinMD.jl")
 include("Load.jl")

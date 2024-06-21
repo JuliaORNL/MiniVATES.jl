@@ -2,9 +2,24 @@ include("test_data_constants.jl")
 include("common.jl")
 
 import MiniVATES
-import Test: @testset
+import JACC
+import Atomix
+import Adapt
+import Test: @testset, @test
 
 @testset "BinMD" begin
+
+    # M = 24
+    # N = 291971545
+    # tv = Adapt.adapt_structure(JACC.Array, zeros(Int, M))
+    # JACC.parallel_for((M, N), (n, i, tv) -> begin
+    #     Atomix.@atomic tv[n] += 1
+    # end, tv)
+    # tvh = Array(tv)
+    # for n = 1:M
+    #     @test tvh[n] == N
+    # end
+
     x = range(start = -7.5375, length = 604, stop = 7.5375)
     y = range(start = -13.16524, length = 604, stop = 13.16524)
     z = range(start = -0.5, length = 2, stop = 0.5)
@@ -18,8 +33,6 @@ import Test: @testset
         eventFile = base_name * "_BEFORE_MDNorm.nxs"
     end
 
-    @show rotFile
-    @show eventFile
     transforms2 = MiniVATES.makeTransforms(MiniVATES.loadExtrasData(rotFile))
     events = MiniVATES.getEvents(MiniVATES.EventWorkspace(eventFile))
 
