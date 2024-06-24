@@ -39,6 +39,8 @@ mutable struct ExtrasData
     m_UB::SquareMatrix3c
     m_W::SquareMatrix3c
 
+    ExtrasData() = new()
+
     function ExtrasData(skip_dets, rotMatrix, symm, m_UB)
         m_W = SquareMatrix3c([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
         new(skip_dets, rotMatrix, symm, m_UB, m_W)
@@ -67,7 +69,7 @@ end
     JACC.parallel_for(
         length(d.symm),
         (i, t) -> begin
-            t.transforms[i] = t.rotMatrix * t.m_UB * t.symm[i] * t.m_W
+            t.transforms[i] = inv(t.rotMatrix * t.m_UB * t.symm[i] * t.m_W)
         end,
         (
             transforms = transforms,

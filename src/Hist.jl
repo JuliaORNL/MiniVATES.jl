@@ -17,8 +17,7 @@ function Hist3(x::AbstractArray, y::AbstractArray, z::AbstractArray)
         nbins,
         V3[x[1], y[1], z[1]],
         V3[x[2] - x[1], y[2] - y[1], z[2] - z[1]],
-        JACC.Array{SignalType,3}(undef, nbins),
-        # zeros(SignalType, nbins),
+        JACC.zeros(SignalType, nbins),
     )
 end
 
@@ -48,12 +47,7 @@ end
     return idx
 end
 
-# @propagate_inbounds function binindex(h::Hist3, x::CoordType, y::CoordType, z::CoordType)
-#     return (binindex1d(h, 1, x), binindex1d(h, 2, y), binindex1d(h, 3, z))
-# end
-
 @propagate_inbounds function binindex(h::Hist3, x, y, z)
-    # return binindex(h, convert(CoordType, x), convert(CoordType, y), convert(CoordType, z))
     return (
         binindex1d(h, 1, convert(CoordType, x)),
         binindex1d(h, 2, convert(CoordType, y)),

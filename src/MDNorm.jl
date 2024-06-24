@@ -49,6 +49,17 @@ mutable struct MDNorm{TArray}
             yValues,
         )
     end
+
+    function MDNorm(
+        hx::TArray,
+        kx::TArray,
+        lx::TArray,
+    ) where {TArray}
+        maxIx = _maxIntersections(hx, kx, lx)
+        intersections = PreallocJaggedArray{Crd4}(1, maxIx)
+        yValues = PreallocJaggedArray{ScalarType}(1, maxIx)
+        new{TArray}(hx, kx, lx, TArray(), ExtrasData(), intersections)
+    end
 end
 
 function MDNorm()
@@ -62,6 +73,10 @@ function MDNorm(
     extrasData::ExtrasData,
 )
     MDNorm(collect(hx), collect(kx), collect(lx), extrasData)
+end
+
+function MDNorm(hx::AbstractRange, kx::AbstractRange, lx::AbstractRange)
+    MDNorm(collect(hx), collect(kx), collect(lx))
 end
 
 function MDNorm(hist::Hist3, extrasData::ExtrasData)
@@ -225,53 +240,53 @@ surrounding the detector position in HKL.
     # return SortedPreallocVector(iPerm, intersections)
 end
 
-@propagate_inbounds function calculateIntersections!(
-    mdn::MDNorm,
-    histogram::THistogram,
-    theta::CoordType,
-    phi::CoordType,
-    transform::SquareMatrix3c,
-    lowvalue::CoordType,
-    highvalue::CoordType,
-    intersections::PreallocVector{Crd4},
-    iPerm::PreallocVector{SizeType},
-) where {THistogram}
-    calculateIntersections!(
-        mdn.hX,
-        mdn.kX,
-        mdn.lX,
-        histogram,
-        theta,
-        phi,
-        transform,
-        lowvalue,
-        highvalue,
-        intersections,
-        iPerm,
-    )
-end
+# @propagate_inbounds function calculateIntersections!(
+#     mdn::MDNorm,
+#     histogram::THistogram,
+#     theta::CoordType,
+#     phi::CoordType,
+#     transform::SquareMatrix3c,
+#     lowvalue::CoordType,
+#     highvalue::CoordType,
+#     intersections::PreallocVector{Crd4},
+#     iPerm::PreallocVector{SizeType},
+# ) where {THistogram}
+#     calculateIntersections!(
+#         mdn.hX,
+#         mdn.kX,
+#         mdn.lX,
+#         histogram,
+#         theta,
+#         phi,
+#         transform,
+#         lowvalue,
+#         highvalue,
+#         intersections,
+#         iPerm,
+#     )
+# end
 
-@propagate_inbounds function calculateIntersections(
-    mdn::MDNorm,
-    histogram::THistogram,
-    theta::CoordType,
-    phi::CoordType,
-    transform::SquareMatrix3c,
-    lowvalue::CoordType,
-    highvalue::CoordType,
-) where {THistogram}
-    intersections = PreallocVector(Vector{Crd4}(undef, maxIntersections(mdn)))
-    return calculateIntersections!(
-        mdn,
-        histogram,
-        theta,
-        phi,
-        transform,
-        lowvalue,
-        highvalue,
-        intersections,
-    )
-end
+# @propagate_inbounds function calculateIntersections(
+#     mdn::MDNorm,
+#     histogram::THistogram,
+#     theta::CoordType,
+#     phi::CoordType,
+#     transform::SquareMatrix3c,
+#     lowvalue::CoordType,
+#     highvalue::CoordType,
+# ) where {THistogram}
+#     intersections = PreallocVector(Vector{Crd4}(undef, maxIntersections(mdn)))
+#     return calculateIntersections!(
+#         mdn,
+#         histogram,
+#         theta,
+#         phi,
+#         transform,
+#         lowvalue,
+#         highvalue,
+#         intersections,
+#     )
+# end
 
 
 """
@@ -426,86 +441,21 @@ detector/spectru
 - `integrFlux`: integral flux workspace
 - `wsIdx::SizeType`: workspace index
 """
-@propagate_inbounds function calculateDiffractionIntersectionIntegral(
-    intersections::PreallocVector{Crd4},
-    integrFlux_x::AbstractRange{ScalarType},
-    integrFlux_y::Vector{ScalarType},
-)
-    yValues = PreallocVector(Vector{ScalarType}(undef, length(intersections)))
-    calculateDiffractionIntersectionIntegral!(
-        intersections,
-        integrFlux_x,
-        integrFlux_y,
-        yValues,
-    )
-    return yValues
-end
+# @propagate_inbounds function calculateDiffractionIntersectionIntegral(
+#     intersections::PreallocVector{Crd4},
+#     integrFlux_x::AbstractRange{ScalarType},
+#     integrFlux_y::Vector{ScalarType},
+# )
+#     yValues = PreallocVector(Vector{ScalarType}(undef, length(intersections)))
+#     calculateDiffractionIntersectionIntegral!(
+#         intersections,
+#         integrFlux_x,
+#         integrFlux_y,
+#         yValues,
+#     )
+#     return yValues
+# end
 
-function _mdnorm_kernel(i, t)
-    @inbounds begin
-        if t.skip_dets[i]
-            return nothing
-        end
-
-        # detID = t.detIDs[i]
-        # wsIdx = get(t.fluxDetToIdx, detID, nothing)
-        # if wsIdx == nothing
-        #     return nothing
-        # end
-        detID = i ### DELETEME
-        if detID > length(t.fluxDetToIdx)
-            return nothing
-        end
-        wsIdx = t.fluxDetToIdx[detID]
-        if wsIdx != 1
-            return nothing
-        end
-
-        intersections = row(t.intersections, i)
-        # sortedIntersections = calculateIntersections!(
-        calculateIntersections!(
-            t.signal.edges[1],
-            t.signal.edges[2],
-            t.signal.edges[3],
-            t.signal,
-            t.theta,
-            t.phi,
-            t.transform,
-            t.lowvalue,
-            t.highvalue,
-            intersections,
-            # row(t.iPerm, i),
-        )
-
-        # if isempty(sortedIntersections)
-        if isempty(intersections)
-            return nothing
-        end
-
-        yValues = row(t.yValues, i)
-        MiniVATES.calculateDiffractionIntersectionIntegral!(
-            intersections,
-            # sortedIntersections,
-            t.integrFlux_x,
-            t.integrFlux_y,
-            yValues,
-        )
-
-        saIdx = t.solidAngDetToIdx[detID]
-        saFactor = t.solidAngleValues[saIdx]
-        solid::ScalarType = t.protonCharge * saFactor
-
-        MiniVATES.calculateSingleDetectorNorm!(
-            intersections,
-            # sortedIntersections,
-            solid,
-            yValues,
-            t.signal,
-        )
-
-        return nothing
-    end
-end
 
 @inline function mdNorm!(
     signal::Hist3,
@@ -518,39 +468,75 @@ end
     for n = 1:length(transforms)
         JACC.parallel_for(
             fluxData.ndets,
-            # _mdnorm_kernel,
             (i, t) -> begin
                 @inbounds begin
-                    transform = t.transforms[t.n]
-                    _mdnorm_kernel(
-                        i,
-                        (
-                            skip_dets = t.skip_dets,
-                            t.fluxDetToIdx,
-                            transform,
-                            t.detIDs,
-                            t.signal,
-                            theta = t.thetaValues[i],
-                            phi = t.phiValues[i],
-                            lowvalue = t.lowValues[i],
-                            highvalue = t.highValues[i],
-                            t.intersections,
-                            # t.iPerm,
-                            t.integrFlux_x,
-                            t.integrFlux_y,
-                            t.yValues,
-                            t.solidAngDetToIdx,
-                            t.solidAngleValues,
-                            t.protonCharge,
-                        )
+                    if t.skip_dets[i]
+                        return nothing
+                    end
+
+                    # detID = t.detIDs[i]
+                    # wsIdx = get(t.fluxDetToIdx, detID, nothing)
+                    # if wsIdx == nothing
+                    #     return nothing
+                    # end
+                    detID = i ### DELETEME
+                    if detID > length(t.fluxDetToIdx)
+                        return nothing
+                    end
+                    wsIdx = t.fluxDetToIdx[detID]
+                    if wsIdx != 1
+                        return nothing
+                    end
+
+                    intersections = row(t.intersections, i)
+                    # sortedIntersections = calculateIntersections!(
+                    calculateIntersections!(
+                        t.signal.edges[1],
+                        t.signal.edges[2],
+                        t.signal.edges[3],
+                        t.signal,
+                        t.thetaValues[i],
+                        t.phiValues[i],
+                        t.transforms[t.n],
+                        t.lowValues[i],
+                        t.highValues[i],
+                        intersections,
+                        # row(t.iPerm, i),
                     )
+
+                    # if isempty(sortedIntersections)
+                    if isempty(intersections)
+                        return nothing
+                    end
+
+                    yValues = row(t.yValues, i)
+                    calculateDiffractionIntersectionIntegral!(
+                        intersections,
+                        # sortedIntersections,
+                        t.integrFlux_x,
+                        t.integrFlux_y,
+                        yValues,
+                    )
+
+                    saIdx = t.solidAngDetToIdx[detID]
+                    saFactor = t.solidAngleValues[saIdx]
+                    solid::ScalarType = t.protonCharge * saFactor
+
+                    calculateSingleDetectorNorm!(
+                        intersections,
+                        # sortedIntersections,
+                        solid,
+                        yValues,
+                        t.signal,
+                    )
+
+                    return nothing
                 end
             end,
             (
                 transforms = transforms,
                 n,
                 skip_dets = mdn.extrasData.skip_dets,
-                # mdn,
                 mdn.intersections,
                 # mdn.iPerm,
                 mdn.yValues,
@@ -568,5 +554,6 @@ end
                 eventData.protonCharge,
             ),
         )
+
     end
 end

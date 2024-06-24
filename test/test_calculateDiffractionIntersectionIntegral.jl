@@ -5,7 +5,6 @@ import MiniVATES
 import MiniVATES: ScalarType, CoordType
 import MiniVATES: SquareMatrix3c, Crd4
 import MiniVATES: Hist3, binweights, reset!
-import MiniVATES: PreallocVector
 import Test: @test, @testset
 import HDF5
 
@@ -39,13 +38,16 @@ import Profile
 
     doctest = MiniVATES.MDNorm(x, y, z, exData)
 
+    ndets = fluxData.ndets
+    maxIx = MiniVATES.maxIntersections(doctest)
+
     try
         @time MiniVATES.mdNorm!(signal, doctest, saData, fluxData, eventData, transforms)
     catch err
         code_warntype(err; interactive = true)
     end
-    # reset!(signal)
-    # @time doctest(saData, fluxData, eventData, signal, transforms)
+    reset!(signal)
+    @time MiniVATES.mdNorm!(signal, doctest, saData, fluxData, eventData, transforms)
     # Profile.clear()
     # Profile.@profile launch_kernel1()
     # statprofilehtml()
@@ -81,12 +83,11 @@ import Profile
     # - make test to run this kernel on CUDA
 
     @time MiniVATES.binEvents!(h, eventData.events, transforms2)
-    # reset!(h)
-    # @time MiniVATES.binEvents!(h, eventData.events, transforms2)
+    reset!(h)
+    @time MiniVATES.binEvents!(h, eventData.events, transforms2)
     # Profile.clear()
     # Profile.@profile launch_kernel2()
     # statprofilehtml()
 
-    # write_cat(signal, h)
-    write_cat(h)
+    write_cat(signal, h)
 end

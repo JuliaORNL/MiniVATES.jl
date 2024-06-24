@@ -1,5 +1,7 @@
+include("test_data_constants.jl")
+
 import MiniVATES
-import MiniVATES: ScalarType, CoordType, PreallocVector
+import MiniVATES: ScalarType, CoordType
 import MiniVATES: Crd4, Hist3, SquareMatrix3c
 import Test: @test, @testset
 import JACC
@@ -11,11 +13,7 @@ import JACC
 
     histogram = Hist3(x, y, z)
 
-    hX = collect(x)
-    kX = collect(y)
-    lX = collect(z)
-
-    doctest = MiniVATES.MDNorm(hX, kX, lX)
+    doctest = MiniVATES.MDNorm(x, y, z)
     maxIx = MiniVATES.maxIntersections(doctest)
 
     open(calc_intersections_file) do f
@@ -24,8 +22,6 @@ import JACC
 
         ndets = parse(Int, readline(f))
 
-        intersections = PreallocVector(Vector{Crd4}(undef, maxIx))
-        iPerm = PreallocVector([n for n = 1:maxIx])
         for i = 1:ndets
             line = split(strip(readline(f)), ' ')
             i_f = parse(Int, line[1])
@@ -43,8 +39,11 @@ import JACC
                 push!(values, parse.(ScalarType, line))
             end
 
-            sortedIntersections = MiniVATES.calculateIntersections!(
-                doctest,
+            intersections = MiniVATES.row(doctest.intersections, 1)
+            MiniVATES.calculateIntersections!(
+                histogram.edges[1],
+                histogram.edges[2],
+                histogram.edges[3],
                 histogram,
                 theta,
                 phi,
@@ -52,12 +51,12 @@ import JACC
                 lowvalue,
                 highvalue,
                 intersections,
-                iPerm,
+                # iPerm,
             )
             @test length(intersections) == num_intersections
             for i = 1:num_intersections
                 for j = 1:4
-                    @test isapprox(sortedIntersections[i][j], values[i][j], rtol = 0.01)
+                    @test isapprox(intersections[i][j], values[i][j], rtol = 0.01)
                 end
             end
         end

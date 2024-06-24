@@ -91,9 +91,13 @@ end
 
 @propagate_inbounds function rowview(a::PreallocJaggedArray, n)
     start = a.start[n] + 1
-    stop = length(a, n)
+    stop = a.start[n] + length(a, n)
     return view(a.data, start:stop)
 end
+
+@inline Base.length(a::PreallocJaggedArray) = length(a.start)
+
+@inline rowSize(a::PreallocJaggedArray) = a.rowSize
 
 @propagate_inbounds function Base.length(a::PreallocJaggedArray, n)
     a.curIdx[n] - 1
@@ -106,7 +110,7 @@ end
 end
 
 @propagate_inbounds function Base.push!(a::PreallocJaggedArray, n, val)
-    a.data[a.curIdx[n]] = val
+    a.data[a.start[n] + a.curIdx[n]] = val
     a.curIdx[n] += 1
     return a
 end
@@ -180,31 +184,31 @@ struct SortedPreallocRow{T} <: AbstractVector{T}
 end
 
 # mutable struct PreallocVector{T} <: CuDeviceVector{T}
-struct PreallocVector{T} <: DenseMatrix{T}
-    data::Array1{T}
-    curIdx::Array1{SizeType}
+# struct PreallocVector{T} <: DenseMatrix{T}
+#     data::Array1{T}
+#     curIdx::Array1{SizeType}
 
-    PreallocVector(v::Array1{T}) where {T} = new{T}(v, 1)
+#     PreallocVector(v::Array1{T}) where {T} = new{T}(v, 1)
 
-    function PreallocVector(v::CUDA.CuDeviceVector{T}, row, rowSize) where {T}
-        start = (row - 1) * rowSize + 1
-        # stop = start + rowSize - 1
-        new{T}(pointer(v, start), 1)
-    end
-end
+#     function PreallocVector(v::CUDA.CuDeviceVector{T}, row, rowSize) where {T}
+#         start = (row - 1) * rowSize + 1
+#         # stop = start + rowSize - 1
+#         new{T}(pointer(v, start), 1)
+#     end
+# end
 
-@inline data(v::PreallocVector) = v.data
+# @inline data(v::PreallocVector) = v.data
 
-@inline Base.convert(::Type{PreallocVector}, v) = PreallocVector(v)
+# @inline Base.convert(::Type{PreallocVector}, v) = PreallocVector(v)
 
-@inline Base.length(v::PreallocVector) = v.curIdx - 1
-@inline Base.size(v::PreallocVector) = (length(v),)
+# @inline Base.length(v::PreallocVector) = v.curIdx - 1
+# @inline Base.size(v::PreallocVector) = (length(v),)
 
-@propagate_inbounds Base.getindex(v::PreallocVector, i) = unsafe_load(v.data, i)
+# @propagate_inbounds Base.getindex(v::PreallocVector, i) = unsafe_load(v.data, i)
 
-@propagate_inbounds function Base.setindex!(v::PreallocVector, x, i)
-    unsafe_store!(v.data, x, i)
-end
+# @propagate_inbounds function Base.setindex!(v::PreallocVector, x, i)
+#     unsafe_store!(v.data, x, i)
+# end
 
 # @propagate_inbounds function Base.push!(v::PreallocVector, val)
 #     v.data[v.curIdx] = val
@@ -226,17 +230,17 @@ end
 #     v.curIdx = 1
 # end
 
-@inline function Base.sortperm!(ix::PreallocVector, v::PreallocVector; lt)
-    len = length(v)
-    if len > 0
-        @inbounds sortperm!(@view(ix.data[1:len]), @view(v.data[1:len]), lt = lt)
-    end
-    return (ix, v)
-end
+# @inline function Base.sortperm!(ix::PreallocVector, v::PreallocVector; lt)
+#     len = length(v)
+#     if len > 0
+#         @inbounds sortperm!(@view(ix.data[1:len]), @view(v.data[1:len]), lt = lt)
+#     end
+#     return (ix, v)
+# end
 
-struct SortedPreallocVector{T} <: AbstractVector{T}
-    perm::PreallocVector{SizeType}
-    data::PreallocVector{T}
+# struct SortedPreallocVector{T} <: AbstractVector{T}
+#     perm::PreallocVector{SizeType}
+#     data::PreallocVector{T}
 
     # function SortedPreallocVector(
     #     p::PreallocVector{SizeType},
@@ -244,13 +248,13 @@ struct SortedPreallocVector{T} <: AbstractVector{T}
     # ) where {T}
     #     new{T}(sortperm!(p, d))
     # end
-end
+# end
 
-@propagate_inbounds function Base.getindex(v::SortedPreallocVector, i::Integer)
-    return v.data[v.perm[i]]
-end
+# @propagate_inbounds function Base.getindex(v::SortedPreallocVector, i::Integer)
+#     return v.data[v.perm[i]]
+# end
 
-@inline Base.length(v::SortedPreallocVector) = length(v.data)
+# @inline Base.length(v::SortedPreallocVector) = length(v.data)
 
 struct Optional{T}
     value::Union{T,Missing}
