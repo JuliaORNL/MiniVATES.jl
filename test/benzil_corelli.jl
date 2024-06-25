@@ -3,7 +3,7 @@ include("common.jl")
 
 import MiniVATES
 import MiniVATES: ScalarType, CoordType
-import MiniVATES: Hist3, SquareMatrix3c, Crd4, PreallocVector
+import MiniVATES: Hist3
 import Test: @testset
 
 @testset "benzil_corelli" begin
@@ -47,8 +47,7 @@ import Test: @testset
         eventFile = benzil_event_nxs_prefix * fNumStr * "_BEFORE_MDNorm.nxs"
         let eventWS = MiniVATES.EventWorkspace(eventFile)
             eventData.protonCharge = MiniVATES.getProtonCharge(eventWS)
-            @time eventData.eventsCtnr, eventData.events =
-                MiniVATES.updateEvents!(eventData.eventsCtnr, eventWS)
+            @time MiniVATES.updateEvents!(eventData, eventWS)
         end
 
         transforms = MiniVATES.makeRotationTransforms(exData)

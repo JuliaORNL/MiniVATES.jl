@@ -291,17 +291,6 @@ end
     return ds
 end
 
-@inline function updateEvents!(events::SubArray, ws::EventWorkspace)
-    ds = _getEventsDataset(ws)
-    dims, _ = HDF5.get_extent_dims(ds)
-    if dims[2] > size(eventsMat)[2]
-        eventsMat = Array2c(undef, dims)
-    end
-    events = view(eventsMat, :, 1:dims[2])
-    copyto!(events, _getEventsDataset(ws))
-    return adapt_structure(JACC.Array, events)
-end
-
 @inline function getEvents(ws::EventWorkspace)
     return adapt_structure(JACC.Array, view(read(_getEventsDataset(ws)), :, :))
 end
@@ -332,6 +321,18 @@ mutable struct EventData
     phiValues::Array1c
     detIDs::Array1{SizeType}
     events::SubArray
+end
+
+@inline function updateEvents!(data::EventData, ws::EventWorkspace)
+    ds = _getEventsDataset(ws)
+    dims, _ = HDF5.get_extent_dims(ds)
+    eventsMat = parent(data.events)
+    if dims[2] > size(eventsMat)[2]
+        eventsMat = Array2c(undef, dims)
+    end
+    events = view(eventsMat, :, 1:dims[2])
+    copyto!(events, _getEventsDataset(ws))
+    data.events = adapt_structure(JACC.Array, events)
 end
 
 function loadEventData(event_nxs_file::AbstractString)
