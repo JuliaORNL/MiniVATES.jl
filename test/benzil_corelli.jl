@@ -53,7 +53,7 @@ import Test: @testset
 
         transforms = MiniVATES.makeRotationTransforms(exData)
 
-        @time doctest(saData, fluxData, eventData, signal, transforms)
+        @time MiniVATES.mdNorm!(signal, doctest, saData, fluxData, eventData, transforms)
 
         @time MiniVATES.binEvents!(h, eventData.events, transforms2)
     end

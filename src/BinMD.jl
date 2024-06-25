@@ -1,12 +1,8 @@
 import Adapt
 
-function binEvents!(
-    h::Hist3,
-    events::SubArray,
-    transforms::Array1{SquareMatrix3c},
-)
+function binEvents!(h::Hist3, events::SubArray, transforms::Array1{SquareMatrix3c})
     JACC.parallel_for(
-        (length(transforms), size(events)[2]),
+        (length(transforms), size(events, 2)),
         (n, i, t) -> begin
             @inbounds begin
                 op = t.transforms[n]

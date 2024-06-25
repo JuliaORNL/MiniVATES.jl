@@ -1,15 +1,17 @@
 include("common.jl")
+include("test_data_constants.jl")
 
 import MiniVATES
 import MiniVATES: ScalarType, CoordType
 import MiniVATES: SquareMatrix3c, Crd4
 import MiniVATES: Hist3, binweights, reset!
-import MiniVATES: PreallocVector
 import Test: @test, @testset
 import HDF5
 
+using JACC
+using Cthulhu
 import Profile
-import StatProfilerHTML: statprofilehtml
+# import StatProfilerHTML: statprofilehtml
 
 @testset "calculateDiffractionIntersectionIntegral" begin
     x = range(-10.0, length = 201, stop = 10.0)
@@ -36,9 +38,13 @@ import StatProfilerHTML: statprofilehtml
 
     doctest = MiniVATES.MDNorm(x, y, z, exData)
 
-    @time doctest(saData, fluxData, eventData, signal, transforms)
+    try
+        @time MiniVATES.mdNorm!(signal, doctest, saData, fluxData, eventData, transforms)
+    catch err
+        code_warntype(err; interactive = true)
+    end
     reset!(signal)
-    @time doctest(saData, fluxData, eventData, signal, transforms)
+    @time MiniVATES.mdNorm!(signal, doctest, saData, fluxData, eventData, transforms)
     # Profile.clear()
     # Profile.@profile launch_kernel1()
     # statprofilehtml()
@@ -56,11 +62,12 @@ import StatProfilerHTML: statprofilehtml
     close(file)
 
     data2d = data[:, :, 1]
-    max_signal = maximum(signal.weights)
     ref_max = 0.0
+    signalWts = Core.Array(binweights(signal))
+    max_signal = maximum(signalWts)
     for i = 1:dims[2]
         for j = 1:dims[1]
-            @test isapprox(data2d[i, j], binweights(signal)[i, j, 1], atol = 1.0e+6)
+            @test isapprox(data2d[i, j], signalWts[i, j, 1], atol = 1.0e+6)
             ref_max = max(ref_max, data2d[j, i])
         end
     end

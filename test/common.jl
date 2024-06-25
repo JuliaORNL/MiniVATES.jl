@@ -7,10 +7,12 @@ function write_cat(signal::Union{Hist3, Nothing}, h::Hist3)
         println(fio, dims[2])
     end
 
-    outWts = Array(MiniVATES.binweights(h))
-    meowWts = ones(SignalType, dims)
+    outWts = Core.Array(MiniVATES.binweights(h))
+    # meowWts = Core.Array{SignalType, 3}()
     if signal isa Hist3
-        meowWts = Array(MiniVATES.binweights(signal))
+        meowWts = Core.Array(MiniVATES.binweights(signal))
+    else
+        meowWts = ones(SignalType, dims)
     end
 
     open("meow.txt", "w") do fio
