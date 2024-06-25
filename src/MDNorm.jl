@@ -234,7 +234,9 @@ surrounding the detector position in HKL.
     # resize!(iPerm, length(intersections))
     # sortperm!(iPerm, intersections, lt = (v1, v2) -> v1[4] < v2[4])
     # bubbleSortPerm!(iPerm, intersections, lt = (v1, v2) -> v1[4] < v2[4])
-    bubbleSort!(intersections, lt = (v1, v2) -> v1[4] < v2[4])
+    # bubbleSort!(intersections, lt = (v1, v2) -> v1[4] < v2[4])
+    # cocktailSort!(intersections, lt = (v1, v2) -> v1[4] < v2[4])
+    combSort!(intersections, lt = (v1, v2) -> v1[4] < v2[4])
 
     # # TODO: sort on construction ?
     # return SortedPreallocVector(iPerm, intersections)

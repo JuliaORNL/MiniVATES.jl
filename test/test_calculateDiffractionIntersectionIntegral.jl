@@ -38,9 +38,6 @@ import Profile
 
     doctest = MiniVATES.MDNorm(x, y, z, exData)
 
-    ndets = fluxData.ndets
-    maxIx = MiniVATES.maxIntersections(doctest)
-
     try
         @time MiniVATES.mdNorm!(signal, doctest, saData, fluxData, eventData, transforms)
     catch err
