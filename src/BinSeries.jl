@@ -20,6 +20,8 @@ using Printf
     return (start + 1, stop + 1)
 end
 
+tmfmt(tm::AbstractFloat) = @sprintf("%3.6f", tm)
+
 @inline function binSeries!(
     signal::Hist3,
     eventsHist::Hist3,
@@ -40,16 +42,22 @@ end
     set_m_W!(exData, m_W)
     transforms2 = makeTransforms(exData)
 
-    rank = MPI.Comm_rank(MPI.COMM_WORLD)
-    commSize = MPI.Comm_size(MPI.COMM_WORLD)
-    start, stop = getRankRange(length(eventFilePairs))
+    comm = MPI.COMM_WORLD
+    rank = MPI.Comm_rank(comm)
+    commSize = MPI.Comm_size(comm)
+    nFiles = length(eventFilePairs)
+    start, stop = getRankRange(nFiles)
 
     if MiniVATES.be_verbose
         if rank == 0
-            println("number of files: ", length(eventFilePairs))
+            println("number of files: ", nFiles)
         end
         @show rank, start, stop
     end
+
+    updAvg = 0.0
+    mdnAvg = 0.0
+    binAvg = 0.0
 
     for fi = start:stop
         exFile, eventFile = eventFilePairs[fi]
@@ -60,23 +68,20 @@ end
         updateEventsTime = nothing
         let eventWS = EventWorkspace(eventFile)
             eventData.protonCharge = getProtonCharge(eventWS)
-            dur = @timed begin
-                updateEvents!(eventData, eventWS)
-            end
-            updateEventsTime = dur.time
+            dur = @elapsed updateEvents!(eventData, eventWS)
+            updateEventsTime = dur
+            updAvg += dur
         end
 
         transforms = makeRotationTransforms(exData)
 
-        dur = @timed begin
-            mdNorm!(signal, mdn, saData, fluxData, eventData, transforms)
-        end
-        mdNormTime = dur.time
+        dur = @elapsed mdNorm!(signal, mdn, saData, fluxData, eventData, transforms)
+        mdNormTime = dur
+        mdnAvg += dur
 
-        dur = @timed begin
-            binEvents!(eventsHist, eventData.events, transforms2)
-        end
-        binEventsTime = dur.time
+        dur = @elapsed binEvents!(eventsHist, eventData.events, transforms2)
+        binEventsTime = dur
+        binAvg += dur
 
         for r = 0:(commSize-1)
             if rank == r
@@ -86,17 +91,26 @@ end
                     "; fi: ",
                     lpad(fi, 3),
                     "; updateEvents: ",
-                    @sprintf("%3.6f", updateEventsTime),
-                    ", mdNorm: ",
-                    @sprintf("%3.6f", mdNormTime),
-                    ", binEvents: ",
-                    @sprintf("%3.6f", binEventsTime),
+                    tmfmt(updateEventsTime),
+                    "s, mdNorm: ",
+                    tmfmt(mdNormTime),
+                    "s, binEvents: ",
+                    tmfmt(binEventsTime),
+                    "s",
                 )
             end
-            MPI.Barrier(MPI.COMM_WORLD)
+            MPI.Barrier(comm)
         end
     end
-    # MPI.Barrier(MPI.COMM_WORLD)
+    sum = MPI.Reduce((updAvg, mdnAvg, binAvg), .+, comm)
+    if rank == 0
+        avg = sum ./ nFiles
+        println("Averages:")
+        println("    updateEvents: ", tmfmt(avg[1]), "s")
+        println("    mdNorm:       ", tmfmt(avg[2]), "s")
+        println("    binEvents:    ", tmfmt(avg[3]), "s")
+        println()
+    end
 
     return (signal, eventsHist)
 end

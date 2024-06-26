@@ -31,3 +31,7 @@ end
 if !ispath(garnet_data_dir)
     create_link(garnet_data_dir)
 end
+
+if !ispath(bixbyite_data_dir)
+    create_link(bixbyite_data_dir)
+end
