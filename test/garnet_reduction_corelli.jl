@@ -32,9 +32,9 @@ import Test: @testset, @test
 
     doctest = MiniVATES.MDNorm(signal, exData)
 
-    @time doctest(saData, fluxData, eventData, signal, transforms)
+    @time MiniVATES.mdNorm!(signal, doctest, saData, fluxData, eventData, transforms)
     reset!(signal)
-    @time doctest(saData, fluxData, eventData, signal, transforms)
+    @time MiniVATES.mdNorm!(signal, doctest, saData, fluxData, eventData, transforms)
 
     # norm file
     file = HDF5.h5open(norm_nxs_file, "r")

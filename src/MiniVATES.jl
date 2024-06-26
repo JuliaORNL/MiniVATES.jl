@@ -18,6 +18,18 @@ elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
     println("Using AMDGPU backend for JACC")
 end
 
+import MPI
+
+function __init__()
+    # - Initialize here instead of main so that the MPI context can be available
+    # for tests.
+    # - Conditional allows for case when external users (or tests) have already
+    # initialized an MPI context.
+    if !MPI.Initialized()
+        MPI.Init()
+    end
+end
+
 include("Util.jl")
 include("PreallocArrays.jl")
 include("Sort.jl")
@@ -25,5 +37,6 @@ include("Hist.jl")
 include("BinMD.jl")
 include("Load.jl")
 include("MDNorm.jl")
+include("BinSeries.jl")
 
 end

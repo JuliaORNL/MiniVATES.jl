@@ -2,6 +2,12 @@ import StaticArrays
 import StaticArrays: SVector, MVector
 import JACC
 
+be_verbose::Bool = false
+function verbose(v = true)
+    be_verbose = v
+    return nothing
+end
+
 @inline function lerp(a, b, t)
     return a + t * (b - a)
 end
@@ -27,14 +33,6 @@ const C4 = StaticArrays.SA{CoordType}
 
 const Id3 = Vector3{SizeType}
 const I3 = StaticArrays.SA{SizeType}
-
-# function setUpIndexMaker(indexMax::Id3)
-#     out = ones(StaticArrays.MVector{3,SizeType})
-#     for i = 2:3
-#         out[i] = out[i - 1] * indexMax[i - 1]
-#     end
-#     return out
-# end
 
 const SquareMatrix3{T} = StaticArrays.SMatrix{3,3,T,9} where {T}
 @inline SquareMatrix3{T}() where {T} = zeros(SquareMatrix3{T})

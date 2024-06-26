@@ -6,7 +6,9 @@ struct ExtrasWorkspace
     file::HDF5.File
 
     function ExtrasWorkspace(filename::AbstractString)
-        println("ExtrasWorkspace: ", filename)
+        if MiniVATES.be_verbose
+            println("ExtrasWorkspace: ", filename)
+        end
         new(HDF5.h5open(filename, "r"))
     end
 end
@@ -93,7 +95,9 @@ struct SolidAngleWorkspace
     file::HDF5.File
 
     function SolidAngleWorkspace(filename::AbstractString)
-        println("SolidAngleWorkspace: ", filename)
+        if MiniVATES.be_verbose
+            println("SolidAngleWorkspace: ", filename)
+        end
         new(HDF5.h5open(filename, "r"))
     end
 end
@@ -173,7 +177,9 @@ struct FluxWorkspace
     file::HDF5.File
 
     function FluxWorkspace(filename::AbstractString)
-        println("FluxWorkspace: ", filename)
+        if MiniVATES.be_verbose
+            println("FluxWorkspace: ", filename)
+        end
         new(HDF5.h5open(filename, "r"))
     end
 end
@@ -271,7 +277,9 @@ struct EventWorkspace
     file::HDF5.File
 
     function EventWorkspace(filename::AbstractString)
-        println("EventWorkspace: ", filename)
+        if MiniVATES.be_verbose
+            println("EventWorkspace: ", filename)
+        end
         new(HDF5.h5open(filename, "r"))
     end
 end

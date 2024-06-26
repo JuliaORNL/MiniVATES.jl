@@ -2,9 +2,11 @@ include("test_data_constants.jl")
 include("common.jl")
 
 import MiniVATES
-import MiniVATES: ScalarType, CoordType
-import MiniVATES: Hist3
+import MiniVATES: Hist3, C3
 import Test: @testset
+
+import MPI
+MPI.Init()
 
 @testset "benzil_corelli" begin
     x = range(start = -7.5375, length = 604, stop = 7.5375)
@@ -13,49 +15,26 @@ import Test: @testset
 
     signal = Hist3(x, y, z)
     h = Hist3(x, y, z)
+    doctest = MiniVATES.MDNorm(signal)
 
-    # rot file
-    rotFile = benzil_event_nxs_prefix * "0_extra_params.hdf5"
-    exData = MiniVATES.loadExtrasData(rotFile)
-
-    # sa file
-    saData = MiniVATES.loadSolidAngleData(benzil_sa_nxs_file)
-
-    haveSA = true
-
-    # flux file
-    fluxData = MiniVATES.loadFluxData(benzil_flux_nxs_file)
-
-    # event file
-    eventFile = benzil_event_nxs_prefix * "0_BEFORE_MDNorm.nxs"
-    eventData = MiniVATES.loadEventData(eventFile)
-
-    MiniVATES.set_m_W!(exData, [1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
-    transforms2 = MiniVATES.makeTransforms(exData)
-
-    doctest = MiniVATES.MDNorm(signal, exData)
-
-    println("file numbers: ", benzil_event_nxs_min, "-", benzil_event_nxs_max)
+    extras_events_files = Vector{NTuple{2,AbstractString}}()
     for file_num = benzil_event_nxs_min:benzil_event_nxs_max
-        println("file #", file_num)
         fNumStr = string(file_num)
-        rotFile = benzil_event_nxs_prefix * fNumStr * "_extra_params.hdf5"
-        let extrasWS = MiniVATES.ExtrasWorkspace(rotFile)
-            exData.rotMatrix = MiniVATES.getRotationMatrix(extrasWS)
-        end
-
+        exFile = benzil_event_nxs_prefix * fNumStr * "_extra_params.hdf5"
         eventFile = benzil_event_nxs_prefix * fNumStr * "_BEFORE_MDNorm.nxs"
-        let eventWS = MiniVATES.EventWorkspace(eventFile)
-            eventData.protonCharge = MiniVATES.getProtonCharge(eventWS)
-            @time MiniVATES.updateEvents!(eventData, eventWS)
-        end
-
-        transforms = MiniVATES.makeRotationTransforms(exData)
-
-        @time MiniVATES.mdNorm!(signal, doctest, saData, fluxData, eventData, transforms)
-
-        @time MiniVATES.binEvents!(h, eventData.events, transforms2)
+        push!(extras_events_files, (exFile, eventFile))
     end
+
+    # MiniVATES.verbose()
+    MiniVATES.binSeries!(
+        signal,
+        h,
+        doctest,
+        benzil_sa_nxs_file,
+        benzil_flux_nxs_file,
+        extras_events_files,
+        C3[1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0],
+    )
 
     write_cat(signal, h)
 end

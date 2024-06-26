@@ -12,10 +12,6 @@ mutable struct MDNorm{TArray}
     kX::TArray
     lX::TArray
     eX::TArray
-    # origin::Crd3
-    # boxLength::Crd3
-    # indexMax::Id3
-    # indexMaker::Id3
     extrasData::ExtrasData
 
     intersections::PreallocJaggedArray{Crd4}
@@ -39,10 +35,6 @@ mutable struct MDNorm{TArray}
             kx,
             lx,
             TArray(),
-            # C3[first(hx), first(kx), first(lx)],
-            # C3[hx[2] - hx[1], kx[2] - kx[1], lx[2] - lx[1]],
-            # indexMax,
-            # setUpIndexMaker(indexMax),
             extrasData,
             intersections,
             # iPerm,
@@ -58,7 +50,7 @@ mutable struct MDNorm{TArray}
         maxIx = _maxIntersections(hx, kx, lx)
         intersections = PreallocJaggedArray{Crd4}(1, maxIx)
         yValues = PreallocJaggedArray{ScalarType}(1, maxIx)
-        new{TArray}(hx, kx, lx, TArray(), ExtrasData(), intersections)
+        new{TArray}(hx, kx, lx, TArray(), ExtrasData(), intersections, yValues)
     end
 end
 
@@ -83,8 +75,18 @@ function MDNorm(hist::Hist3, extrasData::ExtrasData)
     MDNorm(edges(hist)..., extrasData)
 end
 
+MDNorm(hist::Hist3) = MDNorm(edges(hist)...)
 
 @inline maxIntersections(mdn::MDNorm) = _maxIntersections(mdn.hX, mdn.kX, mdn.lX)
+
+@inline function setExtrasData!(mdn::MDNorm, extrasData::ExtrasData)
+    maxIx = maxIntersections(mdn)
+    mdn.extrasData = extrasData
+    ndets = ndet(extrasData)
+    mdn.intersections = PreallocJaggedArray{Crd4}(ndets, maxIx)
+    # iPerm = PreallocJaggedArray{SizeType}(ndets, maxIx)
+    mdn.yValues = PreallocJaggedArray{ScalarType}(ndets, maxIx)
+end
 
 """
     calculateIntersections!() -> Vector{Crd4}
@@ -467,6 +469,26 @@ detector/spectru
     eventData::EventData,
     transforms::Array1{SquareMatrix3c},
 )
+
+                    # @show transforms
+                    # @show mdn.extrasData.skip_dets
+                    # @show mdn.intersections
+                    # @show mdn.yValues
+                    # @show signal
+                    # @show eventData.detIDs
+                    # @show eventData.thetaValues
+                    # @show eventData.phiValues
+                    # @show eventData.lowValues
+                    # @show eventData.highValues
+                    # @show fluxData.fluxDetToIdx
+                    # @show fluxData.integrFlux_x
+                    # @show fluxData.integrFlux_y
+                    # @show saData.solidAngDetToIdx
+                    # @show saData.solidAngleValues
+                    # @show eventData.protonCharge
+
+
+
     for n = 1:length(transforms)
         JACC.parallel_for(
             fluxData.ndets,
@@ -556,6 +578,7 @@ detector/spectru
                 eventData.protonCharge,
             ),
         )
-
     end
+
+    return signal
 end
