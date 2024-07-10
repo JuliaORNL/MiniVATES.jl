@@ -14,7 +14,10 @@ import Pkg
     import CUDA
     println("Using CUDA backend for JACC")
 elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
-    Pkg.add("AMDGPU")
+    if !haskey(Pkg.project().dependencies, "AMDGPU")
+        Pkg.add(; name = "AMDGPU", version = "v0.8.11")
+        import AMDGPU
+    end
     import AMDGPU
     println("Using AMDGPU backend for JACC")
 end
