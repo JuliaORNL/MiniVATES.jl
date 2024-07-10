@@ -24,12 +24,30 @@ export JULIA_AMDGPU_DISABLE_ARTIFACTS=1
 julia --project=$MV_DIR -e 'using Pkg; Pkg.instantiate()'
 
 # cray-mpich
-julia --project=$MV_DIR -e 'using Pkg; Pkg.add("MPIPreferences")'
-julia --project=$MV_DIR -e 'using MPIPreferences; MPIPreferences.use_system_binary(; library_names=["libmpi_cray"], mpiexec="srun")'
+julia --project=$MV_DIR -e ' \
+    using Pkg; \
+    Pkg.add("MPIPreferences"); \
+    '
+julia --project=$MV_DIR -e ' \
+    using MPIPreferences; \
+    MPIPreferences.use_system_binary(mpiexec="srun", vendor="cray"); \
+    '
 
 # amdgpu
-julia --project=$MV_DIR -e 'using Pkg; Pkg.add("AMDGPU")'
-julia --project=$MV_DIR -e 'using JACC; JACC.JACCPreferences.set_backend("amdgpu")'
+julia --project=$MV_DIR -e ' \
+    using Pkg; \
+    Pkg.add(; name="AMDGPU", version = "v0.8.11"); \
+    '
+
+# JACC
+julia --project=$MV_DIR -e ' \
+    using Pkg; \
+    Pkg.add(; name="JACC", rev = "main"); \
+    '
+julia --project=$MV_DIR -e ' \
+    using JACC; \
+    JACC.JACCPreferences.set_backend("amdgpu"); \
+    '
 
 # Verify the packages are installed correctly
 julia --project=$MV_DIR -e 'using Pkg; Pkg.instantiate()'
