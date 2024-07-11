@@ -337,13 +337,15 @@ end
 @inline function updateEvents!(data::EventData, ws::EventWorkspace)
     ds = _getEventsDataset(ws)
     dims, _ = HDF5.get_extent_dims(ds)
-    eventsMat = parent(data.events)
+    eventsMat = Core.Array(parent(data.events))
     if dims[2] > size(eventsMat)[2]
-        eventsMat = Array2c(undef, dims)
+        data.events = adapt_structure(JACC.Array, view(read(_getEventsDataset(ws)), :, :))
+    else
+        events = view(eventsMat, :, 1:dims[2])
+        copyto!(events, _getEventsDataset(ws))
+        data.events = adapt_structure(JACC.Array, events)
     end
-    events = view(eventsMat, :, 1:dims[2])
-    copyto!(events, _getEventsDataset(ws))
-    data.events = adapt_structure(JACC.Array, events)
+    return nothing
 end
 
 function loadEventData(event_nxs_file::AbstractString)

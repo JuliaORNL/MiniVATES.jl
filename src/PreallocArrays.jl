@@ -38,6 +38,20 @@ end
     PreallocJaggedArray{T}(Array1{T}(undef, rowCount * rowSize), rowCount, rowSize)
 end
 
+@inline function PreallocJaggedArray{T}() where {T}
+    PreallocJaggedArray{T}(Array1{T}(), 0, 0, 0)
+end
+
+function reset!(a::PreallocJaggedArray)
+    if a.rowSize == 0
+        return nothing
+    end
+    unsafe_free!(a.data)
+    unsafe_free!(a.start)
+    unsafe_free!(a.curIdx)
+    return nothing
+end
+
 @propagate_inbounds function rowview(a::PreallocJaggedArray, n)
     start = a.start[n] + 1
     stop = a.start[n] + length(a, n)

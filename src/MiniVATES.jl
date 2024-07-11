@@ -12,6 +12,7 @@ import Pkg
         CUDA.set_runtime_version!(local_toolkit=true)
     end
     import CUDA
+    import CUDA.unsafe_free!
     println("Using CUDA backend for JACC")
 elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
     if !haskey(Pkg.project().dependencies, "AMDGPU")
@@ -19,6 +20,7 @@ elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
         import AMDGPU
     end
     import AMDGPU
+    import AMDGPU.unsafe_free!
     println("Using AMDGPU backend for JACC")
 end
 
