@@ -6,7 +6,9 @@ struct ExtrasWorkspace
     file::HDF5.File
 
     function ExtrasWorkspace(filename::AbstractString)
-        println("ExtrasWorkspace: ", filename)
+        if MiniVATES.be_verbose
+            println("ExtrasWorkspace: ", filename)
+        end
         new(HDF5.h5open(filename, "r"))
     end
 end
@@ -93,7 +95,9 @@ struct SolidAngleWorkspace
     file::HDF5.File
 
     function SolidAngleWorkspace(filename::AbstractString)
-        println("SolidAngleWorkspace: ", filename)
+        if MiniVATES.be_verbose
+            println("SolidAngleWorkspace: ", filename)
+        end
         new(HDF5.h5open(filename, "r"))
     end
 end
@@ -173,7 +177,9 @@ struct FluxWorkspace
     file::HDF5.File
 
     function FluxWorkspace(filename::AbstractString)
-        println("FluxWorkspace: ", filename)
+        if MiniVATES.be_verbose
+            println("FluxWorkspace: ", filename)
+        end
         new(HDF5.h5open(filename, "r"))
     end
 end
@@ -191,11 +197,15 @@ end
 
 @inline function getIntegrFlux_y(ws::FluxWorkspace)
     group = ws.file["mantid_workspace_1"]
-    readDataY::Matrix{ScalarType} = read(group["workspace"]["values"])
+    readDataY = read(group["workspace"]["values"])
     dims = size(readDataY)
-    @assert length(dims) == 2
-    @assert dims[2] == 1
-    return adapt_structure(JACC.Array, readDataY[:, 1])
+    @assert (length(dims) == 2 || length(dims) == 1)
+    if length(dims) == 2
+        retData = readDataY[:, 1]
+    else
+        retData = readDataY
+    end
+    return adapt_structure(JACC.Array, retData)
 end
 
 @inline function getFluxDetToIdx_Array(ws::FluxWorkspace)
@@ -203,7 +213,6 @@ end
     dcData = read(group["instrument"]["detector"]["detector_count"])
     dims = size(dcData)
     @assert length(dims) == 1
-    @assert dims[1] == 1
     fluxDetToIdx = Vector{SizeType}()
     detector = 1
     idx = 1
@@ -220,7 +229,7 @@ end
     group = ws.file["mantid_workspace_1"]
     dcData = read(group["instrument"]["detector"]["detector_count"])
     dims = size(dcData)
-    @assert dims == (1,)
+    @assert length(dims) == 1
     fluxDetToIdx = Dict{Int32,SizeType}()
     detector = 1
     idx = 1
@@ -271,7 +280,9 @@ struct EventWorkspace
     file::HDF5.File
 
     function EventWorkspace(filename::AbstractString)
-        println("EventWorkspace: ", filename)
+        if MiniVATES.be_verbose
+            println("EventWorkspace: ", filename)
+        end
         new(HDF5.h5open(filename, "r"))
     end
 end
@@ -320,7 +331,7 @@ mutable struct EventData
     thetaValues::Array1c
     phiValues::Array1c
     detIDs::Array1{SizeType}
-    events::SubArray
+    events::AbstractArray
 end
 
 @inline function updateEvents!(data::EventData, ws::EventWorkspace)

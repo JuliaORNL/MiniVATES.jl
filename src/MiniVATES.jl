@@ -1,3 +1,4 @@
+__precompile__(false)
 module MiniVATES
 
 import JACC
@@ -13,9 +14,24 @@ import Pkg
     import CUDA
     println("Using CUDA backend for JACC")
 elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
-    Pkg.add("AMDGPU")
+    if !haskey(Pkg.project().dependencies, "AMDGPU")
+        Pkg.add(; name = "AMDGPU", version = "v0.8.11")
+        import AMDGPU
+    end
     import AMDGPU
     println("Using AMDGPU backend for JACC")
+end
+
+import MPI
+
+function __init__()
+    # - Initialize here instead of main so that the MPI context can be available
+    # for tests.
+    # - Conditional allows for case when external users (or tests) have already
+    # initialized an MPI context.
+    if !MPI.Initialized()
+        MPI.Init()
+    end
 end
 
 include("Util.jl")
@@ -25,5 +41,6 @@ include("Hist.jl")
 include("BinMD.jl")
 include("Load.jl")
 include("MDNorm.jl")
+include("BinSeries.jl")
 
 end

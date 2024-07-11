@@ -11,9 +11,9 @@ const event_nxs_file = joinpath(test_data_dir, "CORELLI_29782_Before_MDNorm.nxs"
 const norm_nxs_file = joinpath(test_data_dir, "CORELLI_29782_After_MDNorm_symm.nxs")
 
 const benzil_data_dir = joinpath(test_data_dir, "benzil")
-const benzil_event_nxs_prefix = joinpath(benzil_data_dir, "CORELLI_")
 const benzil_sa_nxs_file = joinpath(benzil_data_dir, "SolidAngle20160720NoCC.nxs")
 const benzil_flux_nxs_file = joinpath(benzil_data_dir, "Spectrum20160720NoCC.nxs")
+const benzil_event_nxs_prefix = joinpath(benzil_data_dir, "CORELLI_")
 const benzil_event_nxs_min = 0
 const benzil_event_nxs_max = 35
 
@@ -22,3 +22,10 @@ const garnet_rot_nxs_file = joinpath(garnet_data_dir, "CORELLI_extra_params.hdf5
 const garnet_flux_nxs_file = joinpath(garnet_data_dir, "flux_2p5-8.nxs")
 const garnet_sa_nxs_file = joinpath(garnet_data_dir, "solid_angle_2p5-8.nxs")
 const garnet_event_nxs_file = joinpath(garnet_data_dir, "CORELLI_BEFORE_MDNorm.nxs")
+
+bixbyite_data_dir = joinpath(test_data_dir, "bixbyite")
+const bixbyite_sa_nxs_file = joinpath(bixbyite_data_dir, "solidAngle.nxs")
+const bixbyite_flux_nxs_file = joinpath(bixbyite_data_dir, "spectra.nxs")
+const bixbyite_event_nxs_prefix = joinpath(bixbyite_data_dir, "TOPAZ_")
+const bixbyite_event_nxs_min = 40704
+const bixbyite_event_nxs_max = 40725
