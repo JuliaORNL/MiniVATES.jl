@@ -36,7 +36,6 @@ julia --project=$MV_DIR -e ' \
 julia --project=$MV_DIR -e ' \
     using Pkg; \
     jaccInfo = Pkg.dependencies()[Pkg.project().dependencies["JACC"]]; \
-    @show jaccInfo.git_revision; \
     if jaccInfo.git_revision != "main"; \
         Pkg.add(; name="JACC", rev = "main"); \
     end; \

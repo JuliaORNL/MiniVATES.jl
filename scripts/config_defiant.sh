@@ -23,31 +23,33 @@ export JULIA_AMDGPU_DISABLE_ARTIFACTS=1
 
 julia --project=$MV_DIR -e 'using Pkg; Pkg.instantiate()'
 
-# cray-mpich
+# MPI + AMDGPU
 julia --project=$MV_DIR -e ' \
     using Pkg; \
-    Pkg.add("MPIPreferences"); \
-    '
-julia --project=$MV_DIR -e ' \
+    if !haskey(Pkg.project().dependencies, "MPIPreferences"); \
+        Pkg.add("MPIPreferences"); \
+    end; \
     using MPIPreferences; \
     MPIPreferences.use_system_binary(mpiexec="srun", vendor="cray"); \
-    '
-
-# amdgpu
-julia --project=$MV_DIR -e ' \
-    using Pkg; \
-    Pkg.add(; name="AMDGPU", version = "v0.8.11"); \
+    if !haskey(Pkg.project().dependencies, "AMDGPU"); \
+        Pkg.add(; name="AMDGPU", version = "v0.8.11"); \
+    end; \
     '
 
 # JACC
 julia --project=$MV_DIR -e ' \
     using Pkg; \
-    Pkg.add(; name="JACC", rev = "main"); \
-    '
-julia --project=$MV_DIR -e ' \
+    jaccInfo = Pkg.dependencies()[Pkg.project().dependencies["JACC"]]; \
+    if jaccInfo.git_revision != "main"; \
+        Pkg.add(; name="JACC", rev = "main"); \
+    end; \
     using JACC; \
     JACC.JACCPreferences.set_backend("amdgpu"); \
     '
 
 # Verify the packages are installed correctly
 julia --project=$MV_DIR -e 'using Pkg; Pkg.instantiate()'
+julia --project=$MV_DIR -e ' \
+    using Pkg; \
+    Pkg.status(); \
+    '
