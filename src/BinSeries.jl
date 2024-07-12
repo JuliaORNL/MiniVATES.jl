@@ -102,7 +102,7 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f", tm)
             MPI.Barrier(comm)
         end
     end
-    sum = MPI.Reduce((updAvg, mdnAvg, binAvg), .+, comm)
+    sum = MPI.Reduce((updAvg, mdnAvg, binAvg), MPI.SUM, comm)
     if rank == 0
         avg = sum ./ nFiles
         println("Averages:")
@@ -116,7 +116,7 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f", tm)
 end
 
 function mergeHistogramToRootProcess(hist::Hist3)
-    weights = MPI.Reduce(Core.Array(binweights(hist)), .+, MPI.COMM_WORLD)
+    weights = MPI.Reduce(Core.Array(binweights(hist)), MPI.SUM, MPI.COMM_WORLD)
     x, y, z = edges(hist)
     return Hist3(
         (Core.Array(x), Core.Array(y), Core.Array(z)),
