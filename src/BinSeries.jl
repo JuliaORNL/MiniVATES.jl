@@ -102,7 +102,7 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f", tm)
             MPI.Barrier(comm)
         end
     end
-    sum = MPI.Reduce((updAvg, mdnAvg, binAvg), MPI.SUM, comm)
+    sum = MPI.Reduce([updAvg, mdnAvg, binAvg], MPI.SUM, comm)
     if rank == 0
         avg = sum ./ nFiles
         println("Averages:")
