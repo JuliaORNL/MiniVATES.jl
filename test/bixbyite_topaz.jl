@@ -9,7 +9,8 @@ import MPI
 dur = @elapsed begin
     x = range(start = -16.0, length = 602, stop = 16.0)
     y = range(start = -16.0, length = 602, stop = 16.0)
-    z = range(start = -16.0, length = 602, stop = 16.0)
+    # z = range(start = -16.0, length = 602, stop = 16.0)
+    z = range(start = -0.1, length = 2, stop = 0.1)
 
     signal = Hist3(x, y, z)
     h = Hist3(x, y, z)

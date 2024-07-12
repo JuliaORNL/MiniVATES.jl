@@ -335,7 +335,7 @@ mutable struct EventData
 end
 
 @inline function updateEvents!(data::EventData, ws::EventWorkspace)
-    unsafe_free!(data.events)
+    unsafe_free!(parent(data.events))
     data.events = getEvents(ws)
     return nothing
 end
