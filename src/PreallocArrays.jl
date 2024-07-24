@@ -29,7 +29,7 @@ function PreallocJaggedArray{T}(
     PreallocJaggedArray{T,Array1{T},Array1{SizeType}}(
         m,
         rowSize,
-        Array1([((i - 1) * rowSize) for i = 1:rowCount]),
+        Array1([SizeType((i - 1) * rowSize) for i = 1:rowCount]),
         JACC.ones(SizeType, rowCount),
     )
 end
@@ -39,7 +39,7 @@ end
 end
 
 @inline function PreallocJaggedArray{T}() where {T}
-    PreallocJaggedArray{T}(Array1{T}(), 0, 0, 0)
+    PreallocJaggedArray{T}(Array1{T}(), 0, Array1{SizeType}(), Array1{SizeType}())
 end
 
 function reset!(a::PreallocJaggedArray)

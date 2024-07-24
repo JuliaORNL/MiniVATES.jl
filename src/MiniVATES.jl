@@ -22,6 +22,9 @@ elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
     import AMDGPU
     import AMDGPU.unsafe_free!
     println("Using AMDGPU backend for JACC")
+else
+    function unsafe_free!(arr) end
+    println("Using Threads backend for JACC")
 end
 
 import MPI
