@@ -10,9 +10,14 @@ echo $MV_DIR
 module purge
 
 # load required modules
-module load PrgEnv-cray-amd
-module load cray-mpich
+module load craype-accel-amd-gfx908
+module load PrgEnv-cray
+module load amd
 module load julia
+
+export MPIR_CVAR_GPU_EAGER_DEVICE_MEM=0
+export MPICH_GPU_SUPPORT_ENABLED=1
+export MPICH_SMP_SINGLE_COPY_MODE=CMA
 
 # remove existing generated Manifest.toml
 rm -f $MV_DIR/Manifest.toml
