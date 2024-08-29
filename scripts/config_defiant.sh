@@ -10,9 +10,14 @@ echo $MV_DIR
 module purge
 
 # load required modules
-module load PrgEnv-cray-amd
-module load cray-mpich
+module load craype-accel-amd-gfx908
+module load PrgEnv-cray
+module load amd
 module load julia
+
+export MPIR_CVAR_GPU_EAGER_DEVICE_MEM=0
+export MPICH_GPU_SUPPORT_ENABLED=1
+export MPICH_SMP_SINGLE_COPY_MODE=CMA
 
 # remove existing generated Manifest.toml
 rm -f $MV_DIR/Manifest.toml
@@ -23,31 +28,33 @@ export JULIA_AMDGPU_DISABLE_ARTIFACTS=1
 
 julia --project=$MV_DIR -e 'using Pkg; Pkg.instantiate()'
 
-# cray-mpich
+# MPI + AMDGPU
 julia --project=$MV_DIR -e ' \
     using Pkg; \
-    Pkg.add("MPIPreferences"); \
-    '
-julia --project=$MV_DIR -e ' \
+    if !haskey(Pkg.project().dependencies, "MPIPreferences"); \
+        Pkg.add("MPIPreferences"); \
+    end; \
     using MPIPreferences; \
     MPIPreferences.use_system_binary(mpiexec="srun", vendor="cray"); \
-    '
-
-# amdgpu
-julia --project=$MV_DIR -e ' \
-    using Pkg; \
-    Pkg.add(; name="AMDGPU", version = "v0.8.11"); \
+    if !haskey(Pkg.project().dependencies, "AMDGPU"); \
+        Pkg.add(; name="AMDGPU", version = "v0.8.11"); \
+    end; \
     '
 
 # JACC
 julia --project=$MV_DIR -e ' \
     using Pkg; \
-    Pkg.add(; name="JACC", rev = "main"); \
-    '
-julia --project=$MV_DIR -e ' \
+    jaccInfo = Pkg.dependencies()[Pkg.project().dependencies["JACC"]]; \
+    if jaccInfo.git_revision != "main"; \
+        Pkg.add(; name="JACC", rev = "main"); \
+    end; \
     using JACC; \
     JACC.JACCPreferences.set_backend("amdgpu"); \
     '
 
 # Verify the packages are installed correctly
 julia --project=$MV_DIR -e 'using Pkg; Pkg.instantiate()'
+julia --project=$MV_DIR -e ' \
+    using Pkg; \
+    Pkg.status(); \
+    '

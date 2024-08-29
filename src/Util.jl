@@ -2,6 +2,10 @@ import StaticArrays
 import StaticArrays: SVector, MVector
 import JACC
 
+# @static if endswith(JACC.JACCPreferences.backend, "cuda")
+# elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
+# end
+
 be_verbose::Bool = false
 function verbose(v = true)
     global be_verbose = v

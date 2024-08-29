@@ -2,6 +2,13 @@ import Atomix
 import Adapt
 import Base: @propagate_inbounds
 
+@inline function _maxIntersections(hX, kX, lX)
+    hNPts = length(hX)
+    kNPts = length(kX)
+    lNPts = length(lX)
+    return hNPts + kNPts + lNPts + 2
+end
+
 struct Hist3{TArray1,TArray3}
     edges::NTuple{3,TArray1}
     nbins::NTuple{3,SizeType}
@@ -22,6 +29,10 @@ function Hist3(x::AbstractArray, y::AbstractArray, z::AbstractArray)
 end
 
 Adapt.@adapt_structure Hist3
+
+@inline function maxIntersections(h::Hist3)
+    return _maxIntersections(h.edges[1], h.edges[2], h.edges[3])
+end
 
 @inline edges(h::Hist3) = h.edges
 

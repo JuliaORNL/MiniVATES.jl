@@ -20,7 +20,7 @@ using Printf
     return (start + 1, stop + 1)
 end
 
-tmfmt(tm::AbstractFloat) = @sprintf("%3.6f", tm)
+tmfmt(tm::AbstractFloat) = @sprintf("%3.6fs", tm)
 
 @inline function binSeries!(
     signal::Hist3,
@@ -54,6 +54,10 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f", tm)
         end
         @show rank, start, stop
     end
+
+    updAvgJ = 0.0
+    mdnAvgJ = 0.0
+    binAvgJ = 0.0
 
     updAvg = 0.0
     mdnAvg = 0.0
@@ -92,37 +96,57 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f", tm)
                     lpad(fi, 3),
                     "; updateEvents: ",
                     tmfmt(updateEventsTime),
-                    "s, mdNorm: ",
+                    ", mdNorm: ",
                     tmfmt(mdNormTime),
-                    "s, binEvents: ",
+                    ", binEvents: ",
                     tmfmt(binEventsTime),
-                    "s",
                 )
             end
             MPI.Barrier(comm)
         end
+
+        if fi == start
+            updAvgJ = updAvg
+            mdnAvgJ = mdnAvg
+            binAvgJ = binAvg
+            updAvg = 0.0
+            mdnAvg = 0.0
+            binAvg = 0.0
+        end
     end
-    sum = MPI.Reduce((updAvg, mdnAvg, binAvg), .+, comm)
+    sumJ = [updAvgJ, mdnAvgJ, binAvgJ]
+    MPI.Reduce!(sumJ, MPI.SUM, 0, comm)
+    sum = [updAvg, mdnAvg, binAvg]
+    MPI.Reduce!(sum, MPI.SUM, 0, comm)
     if rank == 0
+        avgJ = sumJ ./ commSize
         avg = sum ./ nFiles
         println("Averages:")
-        println("    updateEvents: ", tmfmt(avg[1]), "s")
-        println("    mdNorm:       ", tmfmt(avg[2]), "s")
-        println("    binEvents:    ", tmfmt(avg[3]), "s")
-        println()
+        println("    updateEvents (JIT): ", tmfmt(avgJ[1]))
+        println("    updateEvents:       ", tmfmt(avg[1]))
+        println("    mdNorm (JIT):       ", tmfmt(avgJ[2]))
+        println("    mdNorm:             ", tmfmt(avg[2]))
+        println("    binEvents (JIT):    ", tmfmt(avgJ[3]))
+        println("    binEvents:          ", tmfmt(avg[3]))
     end
 
     return (signal, eventsHist)
 end
 
-function mergeHistogramToRootProcess(hist::Hist3)
-    weights = MPI.Reduce(Core.Array(binweights(hist)), .+, MPI.COMM_WORLD)
-    x, y, z = edges(hist)
-    return Hist3(
-        (Core.Array(x), Core.Array(y), Core.Array(z)),
-        nbins(hist),
-        origin(hist),
-        boxLength(hist),
-        weights,
-    )
+function mergeHistogramToRootProcess!(hist::Hist3)
+    dur = @elapsed begin
+        weights = Core.Array(binweights(hist))
+        MPI.Reduce!(weights, MPI.SUM, 0, MPI.COMM_WORLD)
+        ret = Hist3(
+            edges(hist),
+            nbins(hist),
+            origin(hist),
+            boxLength(hist),
+            adapt_structure(JACC.Array, weights),
+        )
+    end
+    if MPI.Comm_rank(MPI.COMM_WORLD) == 0
+        println("Reduce: ", tmfmt(dur))
+    end
+    return ret
 end

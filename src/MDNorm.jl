@@ -1,16 +1,9 @@
 import Base: @propagate_inbounds
 
-@inline function _maxIntersections(hX, kX, lX)
-    hNPts = length(hX)
-    kNPts = length(kX)
-    lNPts = length(lX)
-    return hNPts + kNPts + lNPts + 2
-end
-
 mutable struct MDNorm{TArray}
-    hX::TArray
-    kX::TArray
-    lX::TArray
+    # hX::TArray
+    # kX::TArray
+    # lX::TArray
     # eX::TArray
     extrasData::ExtrasData
 
@@ -24,16 +17,17 @@ mutable struct MDNorm{TArray}
         lx::TArray,
         extrasData::ExtrasData,
     ) where {TArray}
-        indexMax = I3[length(hx) - 1, length(kx) - 1, length(lx) - 1]
         maxIx = _maxIntersections(hx, kx, lx)
         ndets = ndet(extrasData)
-        intersections = PreallocJaggedArray{Crd4}(ndets, maxIx)
+        # intersections = PreallocJaggedArray{Crd4}(ndets, maxIx)
+        intersections = PreallocJaggedArray{Crd4}()
         # iPerm = PreallocJaggedArray{SizeType}(ndets, maxIx)
-        yValues = PreallocJaggedArray{ScalarType}(ndets, maxIx)
+        # yValues = PreallocJaggedArray{ScalarType}(ndets, maxIx)
+        yValues = PreallocJaggedArray{ScalarType}()
         new{TArray}(
-            hx,
-            kx,
-            lx,
+            # hx,
+            # kx,
+            # lx,
             # TArray(),
             extrasData,
             intersections,
@@ -48,9 +42,11 @@ mutable struct MDNorm{TArray}
         lx::TArray,
     ) where {TArray}
         maxIx = _maxIntersections(hx, kx, lx)
-        intersections = PreallocJaggedArray{Crd4}(1, maxIx)
-        yValues = PreallocJaggedArray{ScalarType}(1, maxIx)
-        new{TArray}(hx, kx, lx, #= TArray(), =# ExtrasData(), intersections, yValues)
+        # intersections = PreallocJaggedArray{Crd4}(1, maxIx)
+        # yValues = PreallocJaggedArray{ScalarType}(1, maxIx)
+        intersections = PreallocJaggedArray{Crd4}()
+        yValues = PreallocJaggedArray{ScalarType}()
+        new{TArray}(#= hx, kx, lx, TArray(), =# ExtrasData(), intersections, yValues)
     end
 end
 
@@ -77,15 +73,146 @@ end
 
 MDNorm(hist::Hist3) = MDNorm(edges(hist)...)
 
-@inline maxIntersections(mdn::MDNorm) = _maxIntersections(mdn.hX, mdn.kX, mdn.lX)
-
 @inline function setExtrasData!(mdn::MDNorm, extrasData::ExtrasData)
-    maxIx = maxIntersections(mdn)
+    # maxIx = maxIntersections(mdn)
     mdn.extrasData = extrasData
     ndets = ndet(extrasData)
-    mdn.intersections = PreallocJaggedArray{Crd4}(ndets, maxIx)
+    # mdn.intersections = PreallocJaggedArray{Crd4}(ndets, maxIx)
     # iPerm = PreallocJaggedArray{SizeType}(ndets, maxIx)
-    mdn.yValues = PreallocJaggedArray{ScalarType}(ndets, maxIx)
+    # mdn.yValues = PreallocJaggedArray{ScalarType}(ndets, maxIx)
+end
+
+
+@propagate_inbounds function countIntersections(
+    histogram::Hist3,
+    theta::CoordType,
+    phi::CoordType,
+    transform::SquareMatrix3c,
+    lowvalue::CoordType,
+    highvalue::CoordType,
+)
+    sin_theta = sin(theta)
+    qout = C3[sin_theta * cos(phi), sin_theta * sin(phi), cos(theta)]
+    qin = C3[0, 0, 1]
+
+    qout = transform * qout
+    qin = transform * qin
+
+    kimin = lowvalue
+    kimax = highvalue
+    kfmin = kimin
+    kfmax = kimax
+
+    hx = edges(histogram)[1]
+    kx = edges(histogram)[2]
+    lx = edges(histogram)[3]
+
+    hNPts = length(hx)
+    kNPts = length(kx)
+    lNPts = length(lx)
+
+    hStart = qin[1] * kimin - qout[1] * kfmin
+    hEnd = qin[1] * kimax - qout[1] * kfmax
+    hStartIdx = binindex1d(histogram, 1, hStart)
+    hEndIdx = binindex1d(histogram, 1, hEnd)
+    hStartIdx = clamp(hStartIdx, 0, hNPts)
+    hEndIdx = clamp(hEndIdx, 0, hNPts)
+    if hStartIdx > hEndIdx
+        hStartIdx, hEndIdx = (hEndIdx, hStartIdx)
+    end
+    hStartIdx += 1
+
+    kStart = qin[2] * kimin - qout[2] * kfmin
+    kEnd = qin[2] * kimax - qout[2] * kfmax
+    kStartIdx = binindex(histogram, 0, kStart, 0)[2]
+    kEndIdx = binindex(histogram, 0, kEnd, 0)[2]
+    kStartIdx = clamp(kStartIdx, 0, kNPts)
+    kEndIdx = clamp(kEndIdx, 0, kNPts)
+    if kStartIdx > kEndIdx
+        kStartIdx, kEndIdx = (kEndIdx, kStartIdx)
+    end
+    kStartIdx += 1
+
+    lStart = qin[3] * kimin - qout[3] * kfmin
+    lEnd = qin[3] * kimax - qout[3] * kfmax
+    lStartIdx = binindex(histogram, 0, 0, lStart)[3]
+    lEndIdx = binindex(histogram, 0, 0, lEnd)[3]
+    lStartIdx = clamp(lStartIdx, 0, lNPts)
+    lEndIdx = clamp(lEndIdx, 0, lNPts)
+    if lStartIdx > lEndIdx
+        lStartIdx, lEndIdx = (lEndIdx, lStartIdx)
+    end
+    lStartIdx += 1
+
+    count = 0
+
+    # calculate intersections with planes perpendicular to h
+    fmom = (kfmax - kfmin) / (hEnd - hStart)
+    fk = (kEnd - kStart) / (hEnd - hStart)
+    fl = (lEnd - lStart) / (hEnd - hStart)
+    for i = hStartIdx:hEndIdx
+        hi = hx[i]
+        # if hi is between hStart and hEnd, then ki and li will be between
+        # kStart, kEnd and lStart, lEnd and momi will be between kfmin and
+        # kfmax
+        ki = fk * (hi - hStart) + kStart
+        li = fl * (hi - hStart) + lStart
+        if (ki >= kx[1]) && (ki <= kx[kNPts]) && (li >= lx[1]) && (li <= lx[lNPts])
+            momi = fmom * (hi - hStart) + kfmin
+            count += 1
+        end
+    end
+
+    # calculate intersections with planes perpendicular to k
+    fmom = (kfmax - kfmin) / (kEnd - kStart)
+    fh = (hEnd - hStart) / (kEnd - kStart)
+    fl = (lEnd - lStart) / (kEnd - kStart)
+    for i = kStartIdx:kEndIdx
+        ki = kx[i]
+        # if ki is between kStart and kEnd, then hi and li will be between
+        # hStart, hEnd and lStart, lEnd and momi will be between kfmin and
+        # kfmax
+        hi = fh * (ki - kStart) + hStart
+        li = fl * (ki - kStart) + lStart
+        if (hi >= hx[1]) && (hi <= hx[hNPts]) && (li >= lx[1]) && (li <= lx[lNPts])
+            momi = fmom * (ki - kStart) + kfmin
+            count += 1
+        end
+    end
+
+    # calculate intersections with planes perpendicular to l
+    fmom = (kfmax - kfmin) / (lEnd - lStart)
+    fh = (hEnd - hStart) / (lEnd - lStart)
+    fk = (kEnd - kStart) / (lEnd - lStart)
+    for i = lStartIdx:lEndIdx
+        li = lx[i]
+        hi = fh * (li - lStart) + hStart
+        ki = fk * (li - lStart) + kStart
+        if (hi >= hx[1]) && (hi <= hx[hNPts]) && (ki >= kx[1]) && (ki <= kx[kNPts])
+            momi = fmom * (li - lStart) + kfmin
+            count += 1
+        end
+    end
+
+    # endpoints
+    if (hStart >= hx[1]) &&
+       (hStart <= hx[hNPts]) &&
+       (kStart >= kx[1]) &&
+       (kStart <= kx[kNPts]) &&
+       (lStart >= lx[1]) &&
+       (lStart <= lx[lNPts])
+        count += 1
+    end
+    if (hEnd >= hx[1]) &&
+       (hEnd <= hx[hNPts]) &&
+       (kEnd >= kx[1]) &&
+       (kEnd <= kx[kNPts]) &&
+       (lEnd >= lx[1]) &&
+       (lEnd <= lx[lNPts])
+        count += 1
+    end
+
+    return count
 end
 
 """
@@ -103,9 +230,9 @@ surrounding the detector position in HKL.
 - `highvalue`: The highest momentum or energy transfer for the trajectory
 """
 @propagate_inbounds function calculateIntersections!(
-    hx,
-    kx,
-    lx,
+    # hx,
+    # kx,
+    # lx,
     histogram::THistogram,
     theta::CoordType,
     phi::CoordType,
@@ -126,6 +253,10 @@ surrounding the detector position in HKL.
     kimax = highvalue
     kfmin = kimin
     kfmax = kimax
+
+    hx = edges(histogram)[1]
+    kx = edges(histogram)[2]
+    lx = edges(histogram)[3]
 
     hNPts = length(hx)
     kNPts = length(kx)
@@ -469,27 +600,59 @@ detector/spectru
     eventData::EventData,
     transforms::Array1{SquareMatrix3c},
 )
-
-                    # @show transforms
-                    # @show mdn.extrasData.skip_dets
-                    # @show mdn.intersections
-                    # @show mdn.yValues
-                    # @show signal
-                    # @show eventData.detIDs
-                    # @show eventData.thetaValues
-                    # @show eventData.phiValues
-                    # @show eventData.lowValues
-                    # @show eventData.highValues
-                    # @show fluxData.fluxDetToIdx
-                    # @show fluxData.integrFlux_x
-                    # @show fluxData.integrFlux_y
-                    # @show saData.solidAngDetToIdx
-                    # @show saData.solidAngleValues
-                    # @show eventData.protonCharge
-
-
-
     for n = 1:length(transforms)
+        intersectionCounts = JACC.zeros(SizeType, fluxData.ndets)
+        JACC.parallel_for(
+            fluxData.ndets,
+            (i, t) -> begin
+                @inbounds begin
+                    if t.skip_dets[i]
+                        return nothing
+                    end
+
+                    detID = i ### DELETEME
+                    if detID > length(t.fluxDetToIdx)
+                        return nothing
+                    end
+                    wsIdx = t.fluxDetToIdx[detID]
+                    if wsIdx != 1
+                        return nothing
+                    end
+
+                    t.intersectionCounts[i] = countIntersections(
+                        t.signal,
+                        t.thetaValues[i],
+                        t.phiValues[i],
+                        t.transforms[t.n],
+                        t.lowValues[i],
+                        t.highValues[i],
+                    )
+
+                    return nothing
+                end
+            end,
+            (
+                transforms = transforms,
+                n,
+                skip_dets = mdn.extrasData.skip_dets,
+                signal,
+                eventData.thetaValues,
+                eventData.phiValues,
+                eventData.lowValues,
+                eventData.highValues,
+                fluxData.fluxDetToIdx,
+                intersectionCounts,
+            ),
+        )
+        maxIx = maximum(Vector(intersectionCounts))
+
+        if maxIx > rowSize(mdn.intersections)
+            reset!(mdn.intersections)
+            reset!(mdn.yValues)
+            mdn.intersections = PreallocJaggedArray{Crd4}(fluxData.ndets, maxIx)
+            mdn.yValues = PreallocJaggedArray{ScalarType}(fluxData.ndets, maxIx)
+        end
+
         JACC.parallel_for(
             fluxData.ndets,
             (i, t) -> begin
@@ -515,9 +678,6 @@ detector/spectru
                     intersections = row(t.intersections, i)
                     # sortedIntersections = calculateIntersections!(
                     calculateIntersections!(
-                        t.signal.edges[1],
-                        t.signal.edges[2],
-                        t.signal.edges[3],
                         t.signal,
                         t.thetaValues[i],
                         t.phiValues[i],
@@ -525,7 +685,6 @@ detector/spectru
                         t.lowValues[i],
                         t.highValues[i],
                         intersections,
-                        # row(t.iPerm, i),
                     )
 
                     # if isempty(sortedIntersections)
@@ -561,11 +720,10 @@ detector/spectru
                 transforms = transforms,
                 n,
                 skip_dets = mdn.extrasData.skip_dets,
-                mdn.intersections,
+                intersections = mdn.intersections,
                 # mdn.iPerm,
-                mdn.yValues,
+                yValues = mdn.yValues,
                 signal,
-                eventData.detIDs,
                 eventData.thetaValues,
                 eventData.phiValues,
                 eventData.lowValues,

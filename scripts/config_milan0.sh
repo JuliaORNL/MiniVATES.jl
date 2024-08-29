@@ -1,14 +1,10 @@
 #!/bin/bash
 
-MV_DIR=/ccsopen/home/4pf/MiniVATES.jl
+MV_DIR=/home/4pf/MiniVATES.jl
 
 module load nvhpc
-# module load hpcx/hpcx-stack
-# module load hpcx/hpcx-ompi
 
-export CUDA_HOME=/sw/wombat/Nvidia_HPC_SDK/Linux_aarch64/24.5/cuda/12.4
-
-export PATH=$PATH:/ccsopen/home/4pf/.julia/bin
+#export CUDA_HOME=/sw/wombat/Nvidia_HPC_SDK/Linux_aarch64/24.5/cuda/12.4
 
 # rm -f $MV_DIR/Manifest.toml
 # rm -f $MV_DIR/LocalPreferences.toml
@@ -29,15 +25,14 @@ julia --project=$MV_DIR -e ' \
         Pkg.add("CUDA"); \
     end; \
     using CUDA; \
-    CUDA.set_runtime_version!(v"12.4"; local_toolkit=true); \
     '
 
 # JACC
 julia --project=$MV_DIR -e ' \
     using Pkg; \
     jaccInfo = Pkg.dependencies()[Pkg.project().dependencies["JACC"]]; \
-    if jaccInfo.git_revision != "main"; \
-        Pkg.add(; name="JACC", rev = "main"); \
+    if jaccInfo.git_revision != "fix-cuda-thread-counts-2d"; \
+        Pkg.add(; name="JACC", url = "https://github.com/PhilipFackler/JACC.jl.git", rev = "fix-cuda-thread-counts-2d"); \
     end; \
     using JACC; \
     JACC.JACCPreferences.set_backend("cuda"); \

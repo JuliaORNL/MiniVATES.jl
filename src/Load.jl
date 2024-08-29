@@ -335,15 +335,9 @@ mutable struct EventData
 end
 
 @inline function updateEvents!(data::EventData, ws::EventWorkspace)
-    ds = _getEventsDataset(ws)
-    dims, _ = HDF5.get_extent_dims(ds)
-    eventsMat = parent(data.events)
-    if dims[2] > size(eventsMat)[2]
-        eventsMat = Array2c(undef, dims)
-    end
-    events = view(eventsMat, :, 1:dims[2])
-    copyto!(events, _getEventsDataset(ws))
-    data.events = adapt_structure(JACC.Array, events)
+    unsafe_free!(parent(data.events))
+    data.events = getEvents(ws)
+    return nothing
 end
 
 function loadEventData(event_nxs_file::AbstractString)
