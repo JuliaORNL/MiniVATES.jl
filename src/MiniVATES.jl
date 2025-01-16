@@ -2,6 +2,7 @@ __precompile__(false)
 module MiniVATES
 
 import JACC
+JACC.@init_backend
 import Pkg
 
 @static if endswith(JACC.JACCPreferences.backend, "cuda")
