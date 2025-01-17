@@ -1,31 +1,15 @@
-__precompile__(false)
 module MiniVATES
 
 import JACC
 JACC.@init_backend
 import Pkg
 
-@static if endswith(JACC.JACCPreferences.backend, "cuda")
-    if !haskey(Pkg.project().dependencies, "CUDA")
-        # @TODO Julia Pkg.add will add target = :weakdeps in later versions
-        Pkg.add("CUDA")
-        import CUDA
-        CUDA.set_runtime_version!(local_toolkit=true)
-    end
-    import CUDA
+@static if JACC.JACCPreferences.backend == "cuda"
     import CUDA.unsafe_free!
-    println("Using CUDA backend for JACC")
-elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
-    if !haskey(Pkg.project().dependencies, "AMDGPU")
-        Pkg.add(; name = "AMDGPU", version = "v0.8.11")
-        import AMDGPU
-    end
-    import AMDGPU
+elseif JACC.JACCPreferences.backend == "amdgpu"
     import AMDGPU.unsafe_free!
-    println("Using AMDGPU backend for JACC")
 else
     function unsafe_free!(arr) end
-    println("Using Threads backend for JACC")
 end
 
 import MPI
