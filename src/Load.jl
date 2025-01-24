@@ -75,7 +75,7 @@ end
         end,
         (
             transforms = transforms,
-            symm = adapt_structure(JACC.Array, d.symm),
+            symm = adapt_structure(JACCArray, d.symm),
             d.rotMatrix,
             d.m_UB,
             d.m_W,
@@ -111,7 +111,7 @@ end
     # readData = saData[1, :]
     # solidAngleWS = map(x -> [x], readData)
     # return solidAngleWS
-    return adapt_structure(JACC.Array, saData[1,:])
+    return adapt_structure(JACCArray, saData[1,:])
 end
 
 @inline function getSolidAngleToIdx_Array(ws::SolidAngleWorkspace; dataSize = nothing)
@@ -205,7 +205,7 @@ end
     else
         retData = readDataY
     end
-    return adapt_structure(JACC.Array, retData)
+    return adapt_structure(JACCArray, retData)
 end
 
 @inline function getFluxDetToIdx_Array(ws::FluxWorkspace)
@@ -222,7 +222,7 @@ end
         end
         idx += 1
     end
-    return adapt_structure(JACC.Array, fluxDetToIdx)
+    return adapt_structure(JACCArray, fluxDetToIdx)
 end
 
 @inline function getFluxDetToIdx_Dict(ws::FluxWorkspace)
@@ -303,13 +303,13 @@ end
 end
 
 @inline function getEvents(ws::EventWorkspace)
-    return adapt_structure(JACC.Array, view(read(_getEventsDataset(ws)), :, :))
+    return adapt_structure(JACCArray, view(read(_getEventsDataset(ws)), :, :))
 end
 
 @inline function getDetIds(ws::EventWorkspace)
     expGroup = ws.file["MDEventWorkspace"]["experiment0"]
     detGroup = expGroup["instrument"]["physical_detectors"]
-    return adapt_structure(JACC.Array, read(detGroup["detector_number"]))
+    return adapt_structure(JACCArray, read(detGroup["detector_number"]))
 end
 
 @inline function getLowValues(ws::EventWorkspace)

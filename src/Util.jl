@@ -44,12 +44,13 @@ const SquareMatrix3{T} = StaticArrays.SMatrix{3,3,T,9} where {T}
 const SquareMatrix3r = SquareMatrix3{ScalarType}
 const SquareMatrix3c = SquareMatrix3{CoordType}
 
-const Array1 = JACC.Array{T,1} where {T}
+const JACCArray = JACC.array_type()
+const Array1 = JACCArray{T,1} where {T}
 @inline Array1{T}(n::Int64) where {T} = Array1{T}(undef, n)
 const Array1r = Array1{ScalarType}
 const Array1c = Array1{CoordType}
 
-const Array2 = JACC.Array{T,2} where {T}
+const Array2 = JACCArray{T,2} where {T}
 @inline Array2{T}(m::Int64, n::Int64) where {T} = Array2{T}(undef, m, n)
 const Array2c = Array2{CoordType}
 

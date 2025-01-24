@@ -142,7 +142,7 @@ function mergeHistogramToRootProcess!(hist::Hist3)
             nbins(hist),
             origin(hist),
             boxLength(hist),
-            adapt_structure(JACC.Array, weights),
+            adapt_structure(JACCArray, weights),
         )
     end
     if MPI.Comm_rank(MPI.COMM_WORLD) == 0
