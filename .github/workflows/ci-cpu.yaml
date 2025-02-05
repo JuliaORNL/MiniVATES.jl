@@ -22,7 +22,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Instantiate
-        run: julia --project -e 'using Pkg; Pkg.add(name="JACC", rev="main")'
+        run: |
+          which julia
+          [ $? -eq 0 ] || curl -fsSL https://install.julialang.org | sh -s -- -y
+          julia --project -e 'using Pkg; Pkg.add(name="JACC", rev="main")'
 
       - name: Test Serial
         if: contains(matrix.jobname, '-serial')
