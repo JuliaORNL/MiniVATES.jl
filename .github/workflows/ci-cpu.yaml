@@ -23,8 +23,7 @@ jobs:
 
       - name: Instantiate
         run: |
-          which julia
-          [ $? -eq 0 ] || curl -fsSL https://install.julialang.org | sh -s -- -y
+          which julia || curl -fsSL https://install.julialang.org | sh -s -- -y
           julia --project -e 'using Pkg; Pkg.add(name="JACC", rev="main")'
 
       - name: Test Serial
