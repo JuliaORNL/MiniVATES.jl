@@ -24,16 +24,20 @@ jobs:
       - name: Instantiate
         run: |
           which julia || curl -fsSL https://install.julialang.org | sh -s -- -y
-          . /home/runner/.bashrc
+          . /home/runner/.bash_profile
           julia --project -e 'using Pkg; Pkg.add(name="JACC", rev="main")'
 
       - name: Test Serial
         if: contains(matrix.jobname, '-serial')
-        run: julia --project -e 'using Pkg; Pkg.test()'
+        run: |
+          . /home/runner/.bash_profile
+          julia --project -e 'using Pkg; Pkg.test()'
 
       - name: Test Threads
         if: contains(matrix.jobname, '-threads')
-        run: julia -t 4 --project -e 'using Pkg; Pkg.test()'
+        run: |
+          . /home/runner/.bash_profile
+          julia -t 4 --project -e 'using Pkg; Pkg.test()'
 
   macos:
     runs-on: macos-latest
