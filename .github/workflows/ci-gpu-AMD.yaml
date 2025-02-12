@@ -76,8 +76,9 @@ jobs:
         run: |
           source /etc/profile.d/lmod.sh
           module load julia/1.10.4
-          export JULIA_DEPOT_PATH=$(mktemp)
-          echo $JULIA_DEPOT_PATH
+          tmpdir=$(mktemp)
+          export JULIA_DEPOT_PATH="${tmpdir}/julia_depot"
+          echo 'JULIA_DEPOT_PATH=$JULIA_DEPOT_PATH'
           julia --project -e 'using Pkg; Pkg.add(name="JACC", rev="main")'
           julia --project -e 'using Pkg; Pkg.instantiate()'
           julia --project -e 'using JACC; JACC.JACCPreferences.set_backend("amdgpu")'
