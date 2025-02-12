@@ -76,9 +76,8 @@ jobs:
         run: |
           source /etc/profile.d/lmod.sh
           module load julia/1.10.4
-          tmpdir=$(mktemp)
-          export JULIA_DEPOT_PATH="${tmpdir}/julia_depot"
-          echo 'JULIA_DEPOT_PATH=$JULIA_DEPOT_PATH'
+          export JULIA_DEPOT_PATH=$(mktemp -d)
+          echo "JULIA_DEPOT_PATH=$JULIA_DEPOT_PATH"
           julia --project -e 'using Pkg; Pkg.add(name="JACC", rev="main")'
           julia --project -e 'using Pkg; Pkg.instantiate()'
           julia --project -e 'using JACC; JACC.JACCPreferences.set_backend("amdgpu")'
@@ -88,7 +87,7 @@ jobs:
         run: |
           source /etc/profile.d/lmod.sh
           module load julia/1.10.4
-          echo $JULIA_DEPOT_PATH
+          echo "JULIA_DEPOT_PATH=$JULIA_DEPOT_PATH"
           julia --project -e 'using Pkg; Pkg.test()'
 
       - name: Report PR status
