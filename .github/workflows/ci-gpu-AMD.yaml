@@ -74,8 +74,8 @@ jobs:
       - name: Instantiate
         if: steps.check.outputs.triggered == 'true'
         run: |
-          export PATH=$PATH:$HOME/.juliaup/bin/julia
-          export JULIA_DEPOT_PATH=$PWD/../julia_depot
+          curl -fsSL https://install.julialang.org -o juliaup-installer.sh
+          sh juliaup-installer.sh -y
           julia --project -e 'using Pkg; Pkg.add(name="JACC", rev="main")'
           julia --project -e 'using Pkg; Pkg.instantiate()'
           julia --project -e 'using JACC; JACC.JACCPreferences.set_backend("amdgpu")'
