@@ -54,7 +54,7 @@ end
         return 0
     end
 
-    idx = trunc(Int, dist / h.boxLength[d]) + 1
+    idx = unsafe_trunc(Int, dist / h.boxLength[d]) + 1
     if idx > h.nbins[d]
         return h.nbins[d] + 1
     end

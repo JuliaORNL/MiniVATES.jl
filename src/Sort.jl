@@ -98,7 +98,7 @@ end
 # To find gap between elements
 @inline function getNextGap(gap::Int)
     # Shrink gap by Shrink factor
-    gap = trunc(Int, (gap * 10) / 13)
+    gap = unsafe_trunc(Int, (gap * 10) / 13)
 
     if gap < 1
         return 1
