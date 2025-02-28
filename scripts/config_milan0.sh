@@ -30,9 +30,8 @@ julia --project=$MV_DIR -e ' \
 # JACC
 julia --project=$MV_DIR -e ' \
     using Pkg; \
-    jaccInfo = Pkg.dependencies()[Pkg.project().dependencies["JACC"]]; \
-    if jaccInfo.git_revision != "fix-cuda-thread-counts-2d"; \
-        Pkg.add(; name="JACC", url = "https://github.com/PhilipFackler/JACC.jl.git", rev = "fix-cuda-thread-counts-2d"); \
+    if !haskey(Pkg.project().dependencies, "JACC"); \
+        Pkg.add("JACC"); \
     end; \
     using JACC; \
     JACC.JACCPreferences.set_backend("cuda"); \
