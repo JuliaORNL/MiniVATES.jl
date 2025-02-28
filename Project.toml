@@ -6,7 +6,6 @@ version = "0.1.0"
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 JACC = "0979c8fe-16a4-4796-9b82-89a9f10403ea"
@@ -17,7 +16,7 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-JACC = "0.2.0"
+JACC = "0.2.1"
 
 [extras]
 Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
