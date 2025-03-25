@@ -4,9 +4,9 @@ import JACC
 JACC.@init_backend
 import Pkg
 
-if JACC.JACCPreferences.backend == "cuda"
+if JACC.backend == "cuda"
     import CUDA.unsafe_free!
-elseif JACC.JACCPreferences.backend == "amdgpu"
+elseif JACC.backend == "amdgpu"
     import AMDGPU.unsafe_free!
 else
     function unsafe_free!(arr) end

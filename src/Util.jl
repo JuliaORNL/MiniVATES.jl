@@ -65,3 +65,32 @@ ismissing(x::Optional) = x.value === missing
 hasvalue(x::Optional) = !ismissing(x)
 coalesce(x::Optional) = x.value
 Base.convert(::Type{Optional{T}}, ::Missing) where {T} = Optional{T}()
+
+@inline function getRankRange(N::Integer)
+    comm = MPI.COMM_WORLD
+    rank = MPI.Comm_rank(comm)
+    size = MPI.Comm_size(comm)
+    count = trunc(Int, N / size)
+    remainder = trunc(Int, N % size)
+    if rank < remainder
+        # The first 'remainder' ranks get 'count + 1' tasks each
+        start = rank * (count + 1)
+        stop = start + count
+    else
+        # The remaining 'size - remainder' ranks get 'count' task each
+        start = rank * count + remainder
+        stop = start + (count - 1)
+    end
+
+    return (start + 1, stop + 1)
+end
+
+@inline function partitionHistogramRange(r::AbstractRange)
+    N = length(r) - 1
+    binStart, binStop = getRankRange(N)
+    valStart = r[binStart]
+    valStop = r[binStop+1]
+    nBins = binStop - binStart + 1
+    nPts = nBins + 1
+    return range(start = valStart, length = nPts, stop = valStop)
+end

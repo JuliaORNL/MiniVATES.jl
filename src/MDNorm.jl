@@ -646,6 +646,10 @@ detector/spectru
         )
         maxIx = maximum(Vector(intersectionCounts))
 
+        if maxIx == 0
+            continue
+        end
+
         if maxIx > rowSize(mdn.intersections)
             reset!(mdn.intersections)
             reset!(mdn.yValues)

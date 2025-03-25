@@ -1,25 +1,6 @@
 import MPI
 using Printf
 
-@inline function getRankRange(N::Integer)
-    comm = MPI.COMM_WORLD
-    rank = MPI.Comm_rank(comm)
-    size = MPI.Comm_size(comm)
-    count = trunc(Int, N / size)
-    remainder = trunc(Int, N % size)
-    if rank < remainder
-        # The first 'remainder' ranks get 'count + 1' tasks each
-        start = rank * (count + 1)
-        stop = start + count
-    else
-        # The remaining 'size - remainder' ranks get 'count' task each
-        start = rank * count + remainder
-        stop = start + (count - 1)
-    end
-
-    return (start + 1, stop + 1)
-end
-
 tmfmt(tm::AbstractFloat) = @sprintf("%3.6fs", tm)
 
 @inline function binSeries!(
@@ -46,7 +27,8 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6fs", tm)
     rank = MPI.Comm_rank(comm)
     commSize = MPI.Comm_size(comm)
     nFiles = length(eventFilePairs)
-    start, stop = getRankRange(nFiles)
+    # start, stop = getRankRange(nFiles)
+    start, stop = (1, nFiles)
 
     if MiniVATES.be_verbose
         if rank == 0
