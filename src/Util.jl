@@ -1,6 +1,7 @@
 import StaticArrays
 import StaticArrays: SVector, MVector
 import JACC
+import ArgParse
 
 # @static if endswith(JACC.JACCPreferences.backend, "cuda")
 # elseif endswith(JACC.JACCPreferences.backend, "amdgpu")
@@ -93,4 +94,22 @@ end
     nBins = binStop - binStart + 1
     nPts = nBins + 1
     return range(start = valStart, length = nPts, stop = valStop)
+end
+
+struct Options
+    partition::String
+end
+
+function parse_args(args::Vector{String})
+    s = ArgParse.ArgParseSettings()
+    ArgParse.@add_arg_table s begin
+        "--partition", "-p"
+            help = "MPI rank distribution target: files (default), histogram"
+            arg_type = String
+            default = "files"
+    end
+
+    pargs = ArgParse.parse_args(args, s)
+
+    return Options(pargs["partition"])
 end

@@ -5,17 +5,12 @@ import MiniVATES
 import MiniVATES: Hist3, C3
 
 import MPI
-import Cthulhu
+# import Cthulhu
 
 dur = @elapsed begin
-    xtotal = range(start = -7.5375, length = 604, stop = 7.5375)
-    x = MiniVATES.partitionHistogramRange(xtotal)
+    x = range(start = -7.5375, length = 604, stop = 7.5375)
     y = range(start = -13.16524, length = 604, stop = 13.16524)
     z = range(start = -0.5, length = 2, stop = 0.5)
-
-    signal = Hist3(x, y, z)
-    h = Hist3(x, y, z)
-    doctest = MiniVATES.MDNorm(signal)
 
     extras_events_files = Vector{NTuple{2,AbstractString}}()
     for file_num = benzil_event_nxs_min:benzil_event_nxs_max
@@ -26,18 +21,15 @@ dur = @elapsed begin
     end
 
     # MiniVATES.verbose()
-    MiniVATES.binSeries!(
-        signal,
-        h,
-        doctest,
+    signal, h = MiniVATES.binSeries!(
+        MiniVATES.parse_args(ARGS),
+        # MiniVATES.parse_args(["--partition=histogram"])
+        (x,y,z),
         benzil_sa_nxs_file,
         benzil_flux_nxs_file,
         extras_events_files,
         C3[1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0],
     )
-
-    # MiniVATES.mergeHistogramToRootProcess!(signal)
-    # MiniVATES.mergeHistogramToRootProcess!(h)
 end
 
 # if MPI.Comm_rank(MPI.COMM_WORLD) == 0
