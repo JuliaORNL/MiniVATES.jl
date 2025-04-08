@@ -76,7 +76,7 @@ jobs:
         run: |
           export JULIA_DEPOT_PATH=$PWD/../julia_depot
           julia --project -e 'using Pkg; Pkg.add(name="JACC", rev="main")'
-          julia --project -e 'using JACC; JACC.JACCPreferences.set_backend("cuda")'
+          julia --project -e 'using JACC; JACC.set_backend("cuda")'
 
       - name: Test
         if: steps.check.outputs.triggered == 'true'

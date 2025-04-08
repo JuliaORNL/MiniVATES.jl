@@ -643,6 +643,10 @@ detector/spectru
             init = typemin(SizeType)
         )
 
+        if maxIx == 0
+            continue
+        end
+
         if maxIx > rowSize(mdn.intersections)
             reset!(mdn.intersections)
             reset!(mdn.yValues)

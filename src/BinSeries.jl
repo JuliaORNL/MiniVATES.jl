@@ -1,36 +1,34 @@
 import MPI
 using Printf
 
-@inline function getRankRange(N::Integer)
-    comm = MPI.COMM_WORLD
-    rank = MPI.Comm_rank(comm)
-    size = MPI.Comm_size(comm)
-    count = trunc(Int, N / size)
-    remainder = trunc(Int, N % size)
-    if rank < remainder
-        # The first 'remainder' ranks get 'count + 1' tasks each
-        start = rank * (count + 1)
-        stop = start + count
-    else
-        # The remaining 'size - remainder' ranks get 'count' task each
-        start = rank * count + remainder
-        stop = start + (count - 1)
-    end
-
-    return (start + 1, stop + 1)
-end
-
-tmfmt(tm::AbstractFloat) = @sprintf("%3.6fs", tm)
+tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
 
 @inline function binSeries!(
-    signal::Hist3,
-    eventsHist::Hist3,
-    mdn::MDNorm,
+    options::Options,
+    (x, y, z)::NTuple{3,AbstractRange},
     saFile::AbstractString,
     fluxFile::AbstractString,
     eventFilePairs::Vector{NTuple{2,AbstractString}},
     m_W::SquareMatrix3c,
 )
+    comm = MPI.COMM_WORLD
+    rank = MPI.Comm_rank(comm)
+    commSize = MPI.Comm_size(comm)
+    nFiles = length(eventFilePairs)
+
+    if options.partition == "files"
+        start, stop = getRankRange(nFiles)
+    elseif options.partition == "histogram"
+        x = partitionHistogramRange(x)
+        start, stop = (1, nFiles)
+    else
+        error("Invalid partition target")
+    end
+    
+    signal = Hist3(x, y, z)
+    eventsHist = Hist3(x, y, z)
+    mdn = MDNorm(signal)
+
     saData = loadSolidAngleData(saFile)
     fluxData = loadFluxData(fluxFile)
 
@@ -42,11 +40,6 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6fs", tm)
     set_m_W!(exData, m_W)
     transforms2 = makeTransforms(exData)
 
-    comm = MPI.COMM_WORLD
-    rank = MPI.Comm_rank(comm)
-    commSize = MPI.Comm_size(comm)
-    nFiles = length(eventFilePairs)
-    start, stop = getRankRange(nFiles)
 
     if MiniVATES.be_verbose
         if rank == 0
@@ -117,10 +110,11 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6fs", tm)
     sumJ = [updAvgJ, mdnAvgJ, binAvgJ]
     MPI.Reduce!(sumJ, MPI.SUM, 0, comm)
     sum = [updAvg, mdnAvg, binAvg]
+    sum = sum ./ (stop - start)
     MPI.Reduce!(sum, MPI.SUM, 0, comm)
     if rank == 0
         avgJ = sumJ ./ commSize
-        avg = sum ./ nFiles
+        avg = sum ./ commSize
         println("Averages:")
         println("    updateEvents (JIT): ", tmfmt(avgJ[1]))
         println("    updateEvents:       ", tmfmt(avg[1]))
@@ -128,6 +122,11 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6fs", tm)
         println("    mdNorm:             ", tmfmt(avg[2]))
         println("    binEvents (JIT):    ", tmfmt(avgJ[3]))
         println("    binEvents:          ", tmfmt(avg[3]))
+    end
+
+    if options.partition == "files"
+        mergeHistogramToRootProcess!(signal)
+        mergeHistogramToRootProcess!(eventsHist)
     end
 
     return (signal, eventsHist)
