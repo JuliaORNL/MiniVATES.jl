@@ -144,7 +144,7 @@ end
     end
     lStartIdx += 1
 
-    count = 0
+    count = zero(SizeType)
 
     # calculate intersections with planes perpendicular to h
     fmom = (kfmax - kfmin) / (hEnd - hStart)
@@ -601,25 +601,25 @@ detector/spectru
     transforms::Array1{SquareMatrix3c},
 )
     for n = 1:length(transforms)
-        intersectionCounts = JACC.zeros(SizeType, fluxData.ndets)
-        JACC.parallel_for(
+        maxIx = JACC.parallel_reduce(
             fluxData.ndets,
+            max,
             (i, t) -> begin
                 @inbounds begin
                     if t.skip_dets[i]
-                        return nothing
+                        return 0
                     end
 
                     detID = i ### DELETEME
                     if detID > length(t.fluxDetToIdx)
-                        return nothing
+                        return 0
                     end
                     wsIdx = t.fluxDetToIdx[detID]
                     if wsIdx != 1
-                        return nothing
+                        return 0
                     end
 
-                    t.intersectionCounts[i] = countIntersections(
+                    return countIntersections(
                         t.signal,
                         t.thetaValues[i],
                         t.phiValues[i],
@@ -627,8 +627,6 @@ detector/spectru
                         t.lowValues[i],
                         t.highValues[i],
                     )
-
-                    return nothing
                 end
             end,
             (
@@ -641,10 +639,9 @@ detector/spectru
                 eventData.lowValues,
                 eventData.highValues,
                 fluxData.fluxDetToIdx,
-                intersectionCounts,
             ),
+            init = typemin(SizeType)
         )
-        maxIx = maximum(Vector(intersectionCounts))
 
         if maxIx > rowSize(mdn.intersections)
             reset!(mdn.intersections)
