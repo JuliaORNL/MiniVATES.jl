@@ -2,7 +2,7 @@
 
 MV_DIR=/ccsopen/home/4pf/MiniVATES.jl
 
-module load nvhpc
+module load nvhpc/25.1
 
 export CUDA_HOME=/sw/wombat/Nvidia_HPC_SDK/Linux_aarch64/25.1/cuda/12.6
 
