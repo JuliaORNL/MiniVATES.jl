@@ -8,7 +8,7 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
     (x, y, z)::NTuple{3,AbstractRange},
     saFile::AbstractString,
     fluxFile::AbstractString,
-    eventFilePairs::Vector{NTuple{2,AbstractString}},
+    eventFilePairs::Vector{NTuple{3,AbstractString}},
     m_W::SquareMatrix3c,
 )
     comm = MPI.COMM_WORLD
@@ -32,14 +32,14 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
     saData = loadSolidAngleData(saFile)
     fluxData = loadFluxData(fluxFile)
 
-    exFile, eventFile = first(eventFilePairs)
+    exFile, eventFile, fastEventFile = first(eventFilePairs)
     exData = loadExtrasData(exFile)
     setExtrasData!(mdn, exData)
     eventData = loadEventData(eventFile)
+    fastEventData = loadFastEventData(fastEventFile)
 
     set_m_W!(exData, m_W)
-    transforms2 = makeTransforms(exData)
-
+    transforms2 = makeTransformsTranspose(exData)
 
     if MiniVATES.be_verbose
         if rank == 0
@@ -57,15 +57,23 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
     binAvg = 0.0
 
     for fi = start:stop
-        exFile, eventFile = eventFilePairs[fi]
+        exFile, eventFile, fastEventFile = eventFilePairs[fi]
         let extrasWS = ExtrasWorkspace(exFile)
             exData.rotMatrix = getRotationMatrix(extrasWS)
         end
 
+        #updateEventsTime = nothing
+        #let eventWS = EventWorkspace(eventFile)
+        #    eventData.protonCharge = getProtonCharge(eventWS)
+        #    dur = @elapsed updateEvents!(eventData, eventWS)
+        #    updateEventsTime = dur
+        #    updAvg += dur
+        #end
+
         updateEventsTime = nothing
-        let eventWS = EventWorkspace(eventFile)
+        let eventWS = FastEventWorkspace(fastEventFile)
             eventData.protonCharge = getProtonCharge(eventWS)
-            dur = @elapsed updateEvents!(eventData, eventWS)
+            dur = @elapsed updateEvents!(fastEventData, eventWS)
             updateEventsTime = dur
             updAvg += dur
         end
@@ -76,7 +84,7 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
         mdNormTime = dur
         mdnAvg += dur
 
-        dur = @elapsed binEvents!(eventsHist, eventData.events, transforms2)
+        dur = @elapsed binEvents!(eventsHist, fastEventData.events, transforms2)
         binEventsTime = dur
         binAvg += dur
 

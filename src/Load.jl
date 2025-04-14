@@ -91,6 +91,11 @@ end
     # return Array1{SquareMatrix3c}(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
 end
 
+@inline function makeTransformsTranspose(d::ExtrasData)
+    return Array1(map(op -> transpose(inv(d.m_UB * op * d.m_W)), d.symm))
+    # return Array1{SquareMatrix3c}(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
+end
+
 struct SolidAngleWorkspace
     file::HDF5.File
 
@@ -287,7 +292,24 @@ struct EventWorkspace
     end
 end
 
+struct FastEventWorkspace
+    file::HDF5.File
+    function FastEventWorkspace(filename::AbstractString)
+        if MiniVATES.be_verbose
+            println("EventWorkspace: ", filename)
+        end
+        new(HDF5.h5open(filename, "r"))
+    end
+end
+
 @inline function getProtonCharge(ws::EventWorkspace)
+    expGroup = ws.file["MDEventWorkspace"]["experiment0"]
+    pcData = read(expGroup["logs"]["gd_prtn_chrg"]["value"])
+    @assert size(pcData) == (1,)
+    protonCharge = pcData[1]
+end
+
+@inline function getProtonCharge(ws::FastEventWorkspace)
     expGroup = ws.file["MDEventWorkspace"]["experiment0"]
     pcData = read(expGroup["logs"]["gd_prtn_chrg"]["value"])
     @assert size(pcData) == (1,)
@@ -303,6 +325,18 @@ end
 end
 
 @inline function getEvents(ws::EventWorkspace)
+    return adapt_structure(JACCArray, view(read(_getEventsDataset(ws)), :, :))
+end
+
+@inline function _getEventsDataset(ws::FastEventWorkspace)
+    ds = ws.file["MDEventWorkspace"]["event_data"]["position"]
+    dims, _ = HDF5.get_extent_dims(ds)
+    @assert length(dims) == 2
+    @assert dims[2] == 3
+    return ds
+end
+
+@inline function getEvents(ws::FastEventWorkspace)
     return adapt_structure(JACCArray, view(read(_getEventsDataset(ws)), :, :))
 end
 
@@ -334,7 +368,18 @@ mutable struct EventData
     events::AbstractArray
 end
 
+mutable struct FastEventData
+    protonCharge::ScalarType
+    events::AbstractArray
+end
+
 @inline function updateEvents!(data::EventData, ws::EventWorkspace)
+    unsafe_free!(parent(data.events))
+    data.events = getEvents(ws)
+    return nothing
+end
+
+@inline function updateEvents!(data::FastEventData, ws::FastEventWorkspace)
     unsafe_free!(parent(data.events))
     data.events = getEvents(ws)
     return nothing
@@ -392,3 +437,15 @@ function loadEventData(event_nxs_file::AbstractString)
         )
     end
 end
+
+function loadFastEventData(event_nxs_file::AbstractString)
+    let ws = FastEventWorkspace(event_nxs_file)
+        protonCharge = getProtonCharge(ws)
+        events = getEvents(ws)
+        return FastEventData(
+            protonCharge,
+            events,
+        )
+    end
+end
+
