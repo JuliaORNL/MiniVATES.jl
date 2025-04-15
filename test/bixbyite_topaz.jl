@@ -12,10 +12,6 @@ dur = @elapsed begin
     # z = range(start = -16.0, length = 602, stop = 16.0)
     z = range(start = -0.1, length = 2, stop = 0.1)
 
-    signal = Hist3(x, y, z)
-    h = Hist3(x, y, z)
-    doctest = MiniVATES.MDNorm(signal)
-
     extras_events_files = Vector{NTuple{2,AbstractString}}()
     for file_num = bixbyite_event_nxs_min:bixbyite_event_nxs_max
         fNumStr = string(file_num)
@@ -25,21 +21,17 @@ dur = @elapsed begin
     end
 
     # MiniVATES.verbose()
-    MiniVATES.binSeries!(
-        signal,
-        h,
-        doctest,
-        bixbyite_sa_nxs_file,
+    signal, h = MiniVATES.binSeries!(
+        MiniVATES.parse_args(ARGS),
+        # MiniVATES.parse_args(["--partition=histogram"])
+        (x,y,z),
+	bixbyite_sa_nxs_file,
         bixbyite_flux_nxs_file,
         extras_events_files,
         C3[1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0],
     )
 
-    MiniVATES.mergeHistogramToRootProcess!(signal)
-    MiniVATES.mergeHistogramToRootProcess!(h)
 end
 
-if MPI.Comm_rank(MPI.COMM_WORLD) == 0
-    write_cat(signal, h)
-    println("Total app time: ", dur, "s")
-end
+write_rank_cat(signal, h)
+
