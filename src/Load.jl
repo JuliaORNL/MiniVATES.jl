@@ -94,9 +94,9 @@ end
 @inline function makeTransformsTranspose(d::ExtrasData)
     n_symm = size(d.symm)[1]
     println(n_symm)
-    t = Array2c(undef,(3*n_symm, 3))
+    t = Array2c(undef,(9, n_symm))
     for i in 1:n_symm
-        @views t[(i-1)*3+1:i*3,:] = transpose(inv(d.m_UB * d.symm[i] * d.m_W))
+        @views t[:,i] = reshape(transpose(inv(d.m_UB * d.symm[i] * d.m_W)), (9))
     end;
     return t
 end
