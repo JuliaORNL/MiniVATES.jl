@@ -95,6 +95,10 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
             binAvg += dur
 	end
 
+        dur = @elapsed binBoxes!(eventsHist, fastEventData, transforms2)
+        binEventsTime = dur
+        binAvg += dur
+
         println(
             "rank: ",
             lpad(rank, 2),
