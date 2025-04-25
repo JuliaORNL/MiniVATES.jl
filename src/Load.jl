@@ -23,6 +23,7 @@ end
 
 @inline function getSymmMatrices(ws::ExtrasWorkspace)
     symm = Vector{SquareMatrix3c}()
+    #push!(symm, SquareMatrix3c([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]))
     symmGroup = ws.file["symmetryOps"]
     for i = 1:length(symmGroup)
         push!(symm, transpose(read(symmGroup["op_" * string(i - 1)])))
@@ -44,6 +45,7 @@ mutable struct ExtrasData
     ExtrasData() = new()
 
     function ExtrasData(skip_dets, rotMatrix, symm, m_UB)
+        #m_W = SquareMatrix3c([1.0 1.0 0.0; 1.0 -1.0 0.0; 0.0 0.0 1.0])
         m_W = SquareMatrix3c([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
         new(skip_dets, rotMatrix, symm, m_UB, m_W)
     end
@@ -319,6 +321,17 @@ end
     return ds
 end
 
+@inline function _getWeightsDataset(ws::FastEventWorkspace)
+    ds = ws.file["MDEventWorkspace"]["event_data"]["weights"]
+    dims, _ = HDF5.get_extent_dims(ds)
+    @assert length(dims) == 1
+    return ds
+end
+
+@inline function getWeights(ws::FastEventWorkspace)
+    return adapt_structure(JACCArray, read(_getWeightsDataset(ws)))
+end
+
 @inline function _getBoxTypeDataset(ws::FastEventWorkspace)
     ds = ws.file["MDEventWorkspace"]["box_structure"]["box_type"]
     dims, _ = HDF5.get_extent_dims(ds)
@@ -439,7 +452,6 @@ end
 @inline function updateEvents!(data::FastEventData, ws::FastEventWorkspace)
     unsafe_free!(parent(data.events))
     unsafe_free!(parent(data.weights))
-    data.weights = getWeights(ws)
     unsafe_free!(parent(data.boxType))
     unsafe_free!(parent(data.extents))
     unsafe_free!(parent(data.signal))
