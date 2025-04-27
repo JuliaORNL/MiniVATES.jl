@@ -92,13 +92,14 @@ end
 end
 
 @inline function makeTransformsTranspose(d::ExtrasData)
-    n_symm = size(d.symm)[1]
-    println(n_symm)
-    t = Array2c(undef,(9, n_symm))
-    for i in 1:n_symm
-        @views t[:,i] = reshape(transpose(inv(d.m_UB * d.symm[i] * d.m_W)), (9))
-    end;
-    return t
+    #n_symm = size(d.symm)[1]
+    #println(n_symm)
+    #t = Array2c(undef,(9, n_symm))
+    #for i in 1:n_symm
+    #    @views t[:,i] = reshape(transpose(inv(d.m_UB * d.symm[i] * d.m_W)), (9))
+    #end;
+    return Array1(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
+    #return t
 end
 
 struct SolidAngleWorkspace
@@ -211,9 +212,9 @@ end
     dims = size(readDataY)
     @assert (length(dims) == 2 || length(dims) == 1)
     if length(dims) == 2
-        retData = readDataY[:, 1]
-    else
         retData = readDataY
+    else
+        retData = reshape(readDataY, (dims[1], 1))
     end
     return adapt_structure(JACCArray, retData)
 end
@@ -264,7 +265,7 @@ end
 
 struct FluxData
     integrFlux_x::AbstractRange{ScalarType}
-    integrFlux_y::Array1{ScalarType}
+    integrFlux_y::Array2{ScalarType}
     # fluxDetToIdx::Dict{Int32,SizeType}
     fluxDetToIdx::Array1{SizeType}
     ndets::SizeType
@@ -333,6 +334,17 @@ end
     return adapt_structure(JACCArray, view(read(_getEventsDataset(ws)), :, :))
 end
 
+@inline function _getWeightsDataset(ws::FastEventWorkspace)
+    ds = ws.file["MDEventWorkspace"]["event_data"]["weights"]
+    dims, _ = HDF5.get_extent_dims(ds)
+    @assert length(dims) == 1
+    return ds
+end
+
+@inline function getWeights(ws::FastEventWorkspace)
+    return adapt_structure(JACCArray, read(_getWeightsDataset(ws)))
+end
+
 @inline function _getEventsDataset(ws::FastEventWorkspace)
     ds = ws.file["MDEventWorkspace"]["event_data"]["position"]
     dims, _ = HDF5.get_extent_dims(ds)
@@ -376,6 +388,7 @@ end
 mutable struct FastEventData
     protonCharge::ScalarType
     events::AbstractArray
+    weights::Array1c
 end
 
 @inline function updateEvents!(data::EventData, ws::EventWorkspace)
@@ -386,7 +399,9 @@ end
 
 @inline function updateEvents!(data::FastEventData, ws::FastEventWorkspace)
     unsafe_free!(parent(data.events))
+    unsafe_free!(parent(data.weights))
     data.events = getEvents(ws)
+    data.weights = getWeights(ws)
     return nothing
 end
 
@@ -447,9 +462,11 @@ function loadFastEventData(event_nxs_file::AbstractString)
     let ws = FastEventWorkspace(event_nxs_file)
         protonCharge = getProtonCharge(ws)
         events = getEvents(ws)
+        weights = getWeights(ws)
         return FastEventData(
             protonCharge,
             events,
+            weights
         )
     end
 end

@@ -84,7 +84,7 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
         mdNormTime = dur
         mdnAvg += dur
 
-        dur = @elapsed binEvents!(eventsHist, fastEventData.events, transforms2)
+        dur = @elapsed binEvents!(eventsHist, fastEventData.events, fastEventData.weights, transforms2)
         binEventsTime = dur
         binAvg += dur
 
