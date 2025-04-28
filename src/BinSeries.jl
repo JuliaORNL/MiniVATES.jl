@@ -63,14 +63,14 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
         end
 
         updateEventsTime = nothing
-        if options.binmd == "original"
+        if options.binmd == "mantid"
             let eventWS = EventWorkspace(eventFile)
                 eventData.protonCharge = getProtonCharge(eventWS)
                 dur = @elapsed updateEvents!(eventData, eventWS)
                 updateEventsTime = dur
                 updAvg += dur
             end
-        elseif options.binmd == "fast"
+        elseif options.binmd == "columns"
             let eventWS = FastEventWorkspace(fastEventFile)
                 eventData.protonCharge = getProtonCharge(eventWS)
                 dur = @elapsed updateEvents!(fastEventData, eventWS, false)
@@ -92,11 +92,11 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
         mdNormTime = dur
         mdnAvg += dur
 
-        if options.binmd == "original"
+        if options.binmd == "mantid"
             dur = @elapsed binEvents!(eventsHist, eventData.events, transforms2)
             binEventsTime = dur
             binAvg += dur
-        elseif options.binmd == "fast"
+        elseif options.binmd == "columns"
             dur = @elapsed binEvents!(eventsHist, fastEventData.events, fastEventData.weights, transforms2)
             binEventsTime = dur
             binAvg += dur
