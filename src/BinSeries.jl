@@ -62,14 +62,6 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
             exData.rotMatrix = getRotationMatrix(extrasWS)
         end
 
-        #updateEventsTime = nothing
-        #let eventWS = EventWorkspace(eventFile)
-        #    eventData.protonCharge = getProtonCharge(eventWS)
-        #    dur = @elapsed updateEvents!(eventData, eventWS)
-        #    updateEventsTime = dur
-        #    updAvg += dur
-        #end
-
         updateEventsTime = nothing
         if options.binmd == "original"
             let eventWS = EventWorkspace(eventFile)
