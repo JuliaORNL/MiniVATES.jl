@@ -1,13 +1,13 @@
 #!/bin/bash
 
-MV_DIR=/home/svh/MiniVATES.jl
+MV_DIR=/home/4pf/MiniVATES.jl
 
 module load nvhpc
 
 #export CUDA_HOME=/sw/wombat/Nvidia_HPC_SDK/Linux_aarch64/24.5/cuda/12.4
 
-rm -f $MV_DIR/Manifest.toml
-rm -f $MV_DIR/LocalPreferences.toml
+# rm -f $MV_DIR/Manifest.toml
+# rm -f $MV_DIR/LocalPreferences.toml
 
 julia --project=$MV_DIR -e 'using Pkg; Pkg.instantiate()'
 

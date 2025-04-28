@@ -91,17 +91,6 @@ end
     # return Array1{SquareMatrix3c}(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
 end
 
-@inline function makeTransformsTranspose(d::ExtrasData)
-    #n_symm = size(d.symm)[1]
-    #println(n_symm)
-    #t = Array2c(undef,(9, n_symm))
-    #for i in 1:n_symm
-    #    @views t[:,i] = reshape(transpose(inv(d.m_UB * d.symm[i] * d.m_W)), (9))
-    #end;
-    return Array1(map(op -> inv(d.m_UB * op * d.m_W), d.symm))
-    #return t
-end
-
 struct SolidAngleWorkspace
     file::HDF5.File
 
