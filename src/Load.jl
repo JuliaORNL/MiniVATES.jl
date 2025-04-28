@@ -321,17 +321,6 @@ end
     return ds
 end
 
-@inline function _getWeightsDataset(ws::FastEventWorkspace)
-    ds = ws.file["MDEventWorkspace"]["event_data"]["weights"]
-    dims, _ = HDF5.get_extent_dims(ds)
-    @assert length(dims) == 1
-    return ds
-end
-
-@inline function getWeights(ws::FastEventWorkspace)
-    return adapt_structure(JACCArray, read(_getWeightsDataset(ws)))
-end
-
 @inline function _getBoxTypeDataset(ws::FastEventWorkspace)
     ds = ws.file["MDEventWorkspace"]["box_structure"]["box_type"]
     dims, _ = HDF5.get_extent_dims(ds)
@@ -449,19 +438,21 @@ end
     return nothing
 end
 
-@inline function updateEvents!(data::FastEventData, ws::FastEventWorkspace)
+@inline function updateEvents!(data::FastEventData, ws::FastEventWorkspace, boxes::Bool)
     unsafe_free!(parent(data.events))
     unsafe_free!(parent(data.weights))
-    unsafe_free!(parent(data.boxType))
-    unsafe_free!(parent(data.extents))
-    unsafe_free!(parent(data.signal))
-    unsafe_free!(parent(data.eventIndex))
     data.events = getEvents(ws)
     data.weights = getWeights(ws)
-    data.boxType = getBoxType(ws)
-    data.extents = getBoxExtents(ws)
-    data.signal = getBoxSignal(ws)
-    data.eventIndex = getEventIndex(ws)
+    if boxes
+        unsafe_free!(parent(data.boxType))
+        unsafe_free!(parent(data.extents))
+        unsafe_free!(parent(data.signal))
+        unsafe_free!(parent(data.eventIndex))
+        data.boxType = getBoxType(ws)
+        data.extents = getBoxExtents(ws)
+        data.signal = getBoxSignal(ws)
+        data.eventIndex = getEventIndex(ws)
+    end
     return nothing
 end
 

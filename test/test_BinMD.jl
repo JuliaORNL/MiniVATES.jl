@@ -47,8 +47,8 @@ end
 
     # try
         @time MiniVATES.binEvents!(h, eventData.events, transforms2)
-        @time MiniVATES.binEvents!(hf, fastEventsData.events, fastEventsData.weights, transforms2)
-        @time MiniVATES.binBoxes!(hf, fastEventsData, transforms2)
+        @time MiniVATES.binEvents!(hf, fastEventData.events, fastEventData.weights, transforms2)
+        @time MiniVATES.binBoxes!(hb, fastEventData, transforms2)
     # catch err
     #     code_warntype(err; interactive = true)
     # end
@@ -57,8 +57,8 @@ end
     MiniVATES.reset!(hf)
     MiniVATES.reset!(hb)
     @time MiniVATES.binEvents!(h, eventData.events, transforms2)
-    @time MiniVATES.binEvents!(hf, fastEventsData.events, fastEventsData.weights, transforms2)
-    @time MiniVATES.binBoxes!(hf, fastEventsData, transforms2)
+    @time MiniVATES.binEvents!(hf, fastEventData.events, fastEventData.weights, transforms2)
+    @time MiniVATES.binBoxes!(hb, fastEventData, transforms2)
 
     @test binweights(h) == binweights(hf)
     @test binweights(h) == binweights(hb)

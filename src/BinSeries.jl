@@ -73,7 +73,14 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
         elseif options.binmd == "fast"
             let eventWS = FastEventWorkspace(fastEventFile)
                 eventData.protonCharge = getProtonCharge(eventWS)
-                dur = @elapsed updateEvents!(fastEventData, eventWS)
+                dur = @elapsed updateEvents!(fastEventData, eventWS, false)
+                updateEventsTime = dur
+                updAvg += dur
+            end
+        elseif options.binmd == "boxes"
+            let eventWS = FastEventWorkspace(fastEventFile)
+                eventData.protonCharge = getProtonCharge(eventWS)
+                dur = @elapsed updateEvents!(fastEventData, eventWS, true)
                 updateEventsTime = dur
                 updAvg += dur
             end
@@ -93,11 +100,11 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
             dur = @elapsed binEvents!(eventsHist, fastEventData.events, fastEventData.weights, transforms2)
             binEventsTime = dur
             binAvg += dur
+        elseif options.binmd == "boxes"
+            dur = @elapsed binBoxes!(eventsHist, fastEventData, transforms2)
+            binEventsTime = dur
+            binAvg += dur
 	end
-
-        dur = @elapsed binBoxes!(eventsHist, fastEventData, transforms2)
-        binEventsTime = dur
-        binAvg += dur
 
         println(
             "rank: ",
