@@ -201,9 +201,9 @@ end
     dims = size(readDataY)
     @assert (length(dims) == 2 || length(dims) == 1)
     if length(dims) == 2
-        retData = readDataY[:, 1]
-    else
         retData = readDataY
+    else
+        retData = reshape(readDataY, (dims[1], 1))
     end
     return adapt_structure(JACCArray, retData)
 end
@@ -254,7 +254,7 @@ end
 
 struct FluxData
     integrFlux_x::AbstractRange{ScalarType}
-    integrFlux_y::Array1{ScalarType}
+    integrFlux_y::Array2{ScalarType}
     # fluxDetToIdx::Dict{Int32,SizeType}
     fluxDetToIdx::Array1{SizeType}
     ndets::SizeType
@@ -287,7 +287,24 @@ struct EventWorkspace
     end
 end
 
+struct FastEventWorkspace
+    file::HDF5.File
+    function FastEventWorkspace(filename::AbstractString)
+        if MiniVATES.be_verbose
+            println("EventWorkspace: ", filename)
+        end
+        new(HDF5.h5open(filename, "r"))
+    end
+end
+
 @inline function getProtonCharge(ws::EventWorkspace)
+    expGroup = ws.file["MDEventWorkspace"]["experiment0"]
+    pcData = read(expGroup["logs"]["gd_prtn_chrg"]["value"])
+    @assert size(pcData) == (1,)
+    protonCharge = pcData[1]
+end
+
+@inline function getProtonCharge(ws::FastEventWorkspace)
     expGroup = ws.file["MDEventWorkspace"]["experiment0"]
     pcData = read(expGroup["logs"]["gd_prtn_chrg"]["value"])
     @assert size(pcData) == (1,)
@@ -303,6 +320,29 @@ end
 end
 
 @inline function getEvents(ws::EventWorkspace)
+    return adapt_structure(JACCArray, view(read(_getEventsDataset(ws)), :, :))
+end
+
+@inline function _getWeightsDataset(ws::FastEventWorkspace)
+    ds = ws.file["MDEventWorkspace"]["event_data"]["weights"]
+    dims, _ = HDF5.get_extent_dims(ds)
+    @assert length(dims) == 1
+    return ds
+end
+
+@inline function getWeights(ws::FastEventWorkspace)
+    return adapt_structure(JACCArray, read(_getWeightsDataset(ws)))
+end
+
+@inline function _getEventsDataset(ws::FastEventWorkspace)
+    ds = ws.file["MDEventWorkspace"]["event_data"]["position"]
+    dims, _ = HDF5.get_extent_dims(ds)
+    @assert length(dims) == 2
+    @assert dims[2] == 3
+    return ds
+end
+
+@inline function getEvents(ws::FastEventWorkspace)
     return adapt_structure(JACCArray, view(read(_getEventsDataset(ws)), :, :))
 end
 
@@ -334,9 +374,23 @@ mutable struct EventData
     events::AbstractArray
 end
 
+mutable struct FastEventData
+    protonCharge::ScalarType
+    events::AbstractArray
+    weights::Array1c
+end
+
 @inline function updateEvents!(data::EventData, ws::EventWorkspace)
     unsafe_free!(parent(data.events))
     data.events = getEvents(ws)
+    return nothing
+end
+
+@inline function updateEvents!(data::FastEventData, ws::FastEventWorkspace)
+    unsafe_free!(parent(data.events))
+    unsafe_free!(parent(data.weights))
+    data.events = getEvents(ws)
+    data.weights = getWeights(ws)
     return nothing
 end
 
@@ -392,3 +446,17 @@ function loadEventData(event_nxs_file::AbstractString)
         )
     end
 end
+
+function loadFastEventData(event_nxs_file::AbstractString)
+    let ws = FastEventWorkspace(event_nxs_file)
+        protonCharge = getProtonCharge(ws)
+        events = getEvents(ws)
+        weights = getWeights(ws)
+        return FastEventData(
+            protonCharge,
+            events,
+            weights
+        )
+    end
+end
+

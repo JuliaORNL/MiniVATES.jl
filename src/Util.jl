@@ -98,6 +98,7 @@ end
 
 struct Options
     partition::String
+    binmd::String
 end
 
 function parse_args(args::Vector{String})
@@ -107,9 +108,12 @@ function parse_args(args::Vector{String})
             help = "MPI rank distribution target: files (default), histogram"
             arg_type = String
             default = "files"
+        "--binmd", "-b"
+            help = "BinMD implementation strategy: original (default), fast"
+            arg_type = String
+            default = "original"
     end
-
     pargs = ArgParse.parse_args(args, s)
 
-    return Options(pargs["partition"])
+    return Options(pargs["partition"], pargs["binmd"])
 end
