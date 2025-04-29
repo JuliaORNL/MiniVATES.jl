@@ -27,7 +27,7 @@ function binEvents!(h::Hist3, events::AbstractArray, weights::AbstractArray, tra
                 end
             end
         end,
-        (h , events, weights, transforms, t_length = length(transforms)),
+        (h, events, weights, transforms, t_length = length(transforms)),
     )
 end
 

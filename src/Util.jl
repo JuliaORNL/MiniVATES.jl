@@ -109,9 +109,9 @@ function parse_args(args::Vector{String})
             arg_type = String
             default = "files"
         "--binmd", "-b"
-            help = "BinMD implementation strategy: original (default), fast"
+            help = "BinMD implementation strategy: mantid (default), columns, boxes"
             arg_type = String
-            default = "original"
+            default = "mantid"
     end
     pargs = ArgParse.parse_args(args, s)
 
