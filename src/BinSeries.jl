@@ -92,6 +92,7 @@ tmfmt(tm::AbstractFloat) = @sprintf("%3.6f s", tm)
         mdNormTime = dur
         mdnAvg += dur
 
+        binEventsTime = nothing
         if options.binmd == "mantid"
             dur = @elapsed binEvents!(eventsHist, eventData.events, transforms2)
             binEventsTime = dur
