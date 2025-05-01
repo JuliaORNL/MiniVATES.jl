@@ -32,8 +32,8 @@ julia --project=$MV_DIR -e ' \
 julia --project=$MV_DIR -e ' \
     using Pkg; \
     jaccInfo = Pkg.dependencies()[Pkg.project().dependencies["JACC"]]; \
-    if jaccInfo.git_revision != "v0.3.1"; \
-        Pkg.add(; name="JACC", rev = "v0.3.1"); \
+    if jaccInfo.git_revision != "v0.4.0"; \
+        Pkg.add(; name="JACC", rev = "v0.4.0"); \
     end; \
     using JACC; \
     JACC.set_backend("cuda"); \
